@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  gaussian_splatting:
+    build: .
+    volumes:
+      - ./data:/app/data
+    runtime: nvidia
+    environment:
+      - CUDA_HOME=/usr/local/cuda
+    ports:
+      - "5000:5000"  # Se hai un'API o se vuoi monitorare lo stato
+    command: ["conda", "run", "-n", "/app/gaussian_splatting_env", "python", "train.py"]
