@@ -5,7 +5,7 @@ services:
     build:
       context: ./api-gateway  # Cartella di build per api-gateway
       dockerfile: Dockerfile  # Specifica il Dockerfile nella cartella api-gateway
-    container_name: api-gateway
+    container_name: api-gateway-image
     ports:
       - "8000:8000"
     depends_on:
@@ -17,7 +17,7 @@ services:
 
   mongo:
     image: mongo
-    container_name: mongo
+    container_name: mongo-image
     ports:
       - "27017:27017"
     volumes:
@@ -27,6 +27,13 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=3d_gaussian_splatting
 
+  gaussian-splatting:  # Cambiato da "app" a "api-gateway"
+    build:
+      context: ./gaussian-splatting  # Cartella di build per api-gateway
+      dockerfile: Dockerfile  # Specifica il Dockerfile nella cartella api-gateway
+    container_name: gaussian-splatting-image
+    networks:
+      - my_network
 
 
 
