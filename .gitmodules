@@ -1,3 +1,6 @@
 [submodule "gaussian_splatting"]
 	path = gaussian_splatting
 	url = https://github.com/graphdeco-inria/gaussian-splatting
+[submodule "api-gateway"]
+	path = api-gateway
+	url = https://github.com/claudiorain/3dgs_api_gateway.git
