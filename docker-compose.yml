@@ -1,12 +1,39 @@
 version: '3.8'
+
 services:
-  gaussian_splatting:
-    build: .
-    volumes:
-      - ./data:/app/data
-    runtime: nvidia
-    environment:
-      - CUDA_HOME=/usr/local/cuda
+  api-gateway:  # Cambiato da "app" a "api-gateway"
+    build:
+      context: ./api-gateway  # Cartella di build per api-gateway
+      dockerfile: Dockerfile  # Specifica il Dockerfile nella cartella api-gateway
+    container_name: api-gateway
     ports:
-      - "5000:5000"  # Se hai un'API o se vuoi monitorare lo stato
-    command: ["conda", "run", "-n", "/app/gaussian_splatting_env", "python", "train.py"]
+      - "8000:8000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/my_database
+    networks:
+      - my_network
+
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db  # Aggiungi il volume persistente per MongoDB
+    networks:
+      - my_network
+    environment:
+      - MONGO_INITDB_DATABASE=3d_gaussian_splatting
+
+
+
+
+volumes:
+  mongodb_data:  # Definisce il volume persistente
+    driver: local
+
+networks:
+  my_network:
+    driver: bridge
