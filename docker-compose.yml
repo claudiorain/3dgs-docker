@@ -9,15 +9,38 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - mongo
+      mongo: 
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
     environment:
       - MONGO_URI=mongodb://mongo:27017/my_database
+      - RABBITMQ_URI=amqp://claudiorain:Pass4r*q@rabbitmq:5672  # URI RabbitMQ
+    networks:
+      - my_network
+
+  job-executor:
+    build:
+      context: ./job-executor
+      dockerfile: Dockerfile  # Dockerfile per job-executor
+    container_name: job-executor-image
+    depends_on:
+      mongo: 
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/my_database
+      - RABBITMQ_URI=amqp://claudiorain:Pass4r*q@rabbitmq:5672  # URI RabbitMQ
+    restart: always
     networks:
       - my_network
 
   mongo:
     image: mongo
     container_name: mongo-image
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
     ports:
       - "27017:27017"
     volumes:
@@ -27,20 +50,37 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=3d_gaussian_splatting
 
-  gaussian-splatting:  # Cambiato da "app" a "api-gateway"
-    build:
-      context: ./gaussian-splatting  # Cartella di build per api-gateway
-      dockerfile: Dockerfile  # Specifica il Dockerfile nella cartella api-gateway
-    container_name: gaussian-splatting-image
+  rabbitmq:
+    image: "rabbitmq:management"  # Usa l'immagine RabbitMQ con interfaccia di gestione
+    container_name: rabbitmq-image
+    hostname: 3dgs-job-queue    
+    ports:
+      - "15672:15672"  # Interfaccia di gestione RabbitMQ
+      - "5672:5672"    # Porta di comunicazione AMQP (RabbitMQ)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/mnesia/  # Aggiungi il volume persistente per Rabbitmq
     networks:
       - my_network
+    environment:
+      - RABBITMQ_DEFAULT_USER=claudiorain
+      - RABBITMQ_DEFAULT_PASS=Pass4r*q
 
-
-
+ 
 volumes:
   mongodb_data:  # Definisce il volume persistente
+    driver: local
+  rabbitmq_data:  # Definisce il volume persistente
     driver: local
 
 networks:
   my_network:
     driver: bridge
+
+
+  # gaussian-splatting:  # Cambiato da "app" a "api-gateway"
+  #  build:
+ #     context: ./gaussian-splatting  # Cartella di build per api-gateway
+ #     dockerfile: Dockerfile  # Specifica il Dockerfile nella cartella api-gateway
+#    container_name: gaussian-splatting-image
+#    networks:
+ #     - my_network

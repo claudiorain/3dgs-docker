@@ -1,13 +1,16 @@
-1) Installa docker-compose se non usi Docker Desktop
+1) Installa docker se non usi Docker Desktop
+    sudo apt install -y docker
+
+2) Installa docker-compose se non usi Docker Desktop
     sudo apt install -y docker-compose
 
-2) Esegui docker-compose dalla root del progetto
-   docker-compose up --build
+3) Esegi docker-compose dalla root del progetto
+   sudo docker-compose up --build
 
 Comandi utili:
-docker-compose up -d --build: Effettua il build dell'applicazione
+sudo docker-compose up -d --build: Effettua il build dell'applicazione
 
-docker-compose down: Rimuove i container ma mantiene i volumi
-docker-compose down -v: Rimuove i container E i volumi
-docker-compose down --rmi local: Rimuove i container e le immagini locali, ma mantiene i volumi
+sudo docker-compose down: Rimuove i container ma mantiene i volumi
+sudo docker-compose down -v: Rimuove i container E i volumi
+sudo docker-compose down --rmi local: Rimuove i container e le immagini locali, ma mantiene i volumi
    
