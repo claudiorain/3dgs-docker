@@ -2,6 +2,6 @@
 	path = api-gateway
 	url = https://github.com/claudiorain/3dgs_api_gateway.git
 [submodule "job-executor"]
-    path = job-executor
-    url = https://github.com/claudiorain/3dgs-job-executor.git
+	path = job-executor
+	url = https://github.com/claudiorain/3dgs-job-executor.git
 
