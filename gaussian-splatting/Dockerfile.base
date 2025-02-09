@@ -1,0 +1,43 @@
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
+
+ARG TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6+PTX"
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Installa i pacchetti essenziali
+RUN apt update && apt install -y git libglew-dev libassimp-dev libboost-all-dev libgtk-3-dev \
+    git \
+    cmake \
+    ninja-build \
+    build-essential \
+    libboost-program-options-dev \
+    libboost-graph-dev \
+    libboost-system-dev \
+    libeigen3-dev \
+    libflann-dev \
+    libfreeimage-dev \
+    libmetis-dev \
+    libgoogle-glog-dev \
+    libgtest-dev \
+    libgmock-dev \
+    libsqlite3-dev \
+    libglew-dev \
+    qtbase5-dev \
+    libqt5opengl5-dev \
+    libcgal-dev \
+    libceres-dev \
+    libxxf86vm-dev libembree-dev docker.io wget && \
+    apt clean && rm -rf /var/lib/apt/lists/*
+
+# Crea la cartella di lavoro
+WORKDIR /workspace
+RUN git clone https://github.com/graphdeco-inria/gaussian-splatting --recursive
+
+# Installa Conda e crea l'ambiente
+WORKDIR /workspace/gaussian-splatting
+
+RUN conda env create --file environment.yml
+
+# Assicura che Conda sia attivata
+RUN echo "source /opt/conda/etc/profile.d/conda.sh && conda activate gaussian_splatting" >> ~/.bashrc
+
+# Salva questa immagine base
