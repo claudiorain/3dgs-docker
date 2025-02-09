@@ -4,7 +4,7 @@
 2) Installa docker-compose se non usi Docker Desktop
     sudo apt install -y docker-compose
 
-3) Esegi docker-compose dalla root del progetto
+3) Esegui docker-compose dalla root del progetto
    sudo docker-compose up --build
 
 Comandi utili:
