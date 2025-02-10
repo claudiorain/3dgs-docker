@@ -3,7 +3,7 @@ services:
     build:
       context: ./api-gateway  # Cartella di build per api-gateway
       dockerfile: Dockerfile  # Specifica il Dockerfile nella cartella api-gateway
-    container_name: api-gateway-image
+    container_name: api-gateway
     ports:
       - "8000:8000"
     depends_on:
@@ -24,7 +24,7 @@ services:
     build:
       context: ./job-executor
       dockerfile: Dockerfile  # Dockerfile per job-executor
-    container_name: job-executor-image
+    container_name: job-executor
     depends_on:
       mongo: 
         condition: service_healthy
@@ -50,7 +50,7 @@ services:
     build:
       context: ./gaussian-splatting  # Cartella di build per api-gateway
       dockerfile: Dockerfile.base  # Usa Dockerfile.base per costruire l'immagin
-    container_name: gaussian-splatting-base-image
+    container_name: gaussian-splatting-base
     image: gaussian-splatting-base  # 👈 Aggiungi questa riga
     networks:
       - my_network
@@ -66,7 +66,7 @@ services:
     build:
       context: ./gaussian-splatting  # Nuovo servizio API per Gaussian Splatting
       dockerfile: Dockerfile
-    container_name: gaussian-splatting-api-image
+    container_name: gaussian-splatting-api
     volumes:
       - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
       - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
@@ -88,9 +88,23 @@ services:
             - driver: nvidia
               count: 1  # Usa tutte le GPU disponibili
               capabilities: [gpu]
+
+  web-viewer:
+    build:
+      context: ./web-viewer
+      dockerfile: Dockerfile
+    container_name: web-viewer
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - my_network
+      
   mongo:
     image: mongo
-    container_name: mongo-image
+    container_name: mongo
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
     ports:
@@ -104,7 +118,7 @@ services:
 
   rabbitmq:
     image: "rabbitmq:3-management"  # Usa l'immagine RabbitMQ con interfaccia di gestione
-    container_name: rabbitmq-image
+    container_name: rabbitmq
     hostname: 3dgs-job-queue    
     ports:
       - "15672:15672"  # Interfaccia di gestione RabbitMQ

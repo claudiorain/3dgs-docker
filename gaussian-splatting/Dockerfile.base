@@ -2,6 +2,7 @@ FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
 
 ARG TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6+PTX"
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LD_LIBRARY_PATH = "/usr/local/lib"
 
 # Installa i pacchetti essenziali
 RUN apt update && apt install -y git libglew-dev libassimp-dev libboost-all-dev libgtk-3-dev \
@@ -25,6 +26,7 @@ RUN apt update && apt install -y git libglew-dev libassimp-dev libboost-all-dev 
     libqt5opengl5-dev \
     libcgal-dev \
     libceres-dev \
+    libgl1-mesa-glx libx11-dev libglu1-mesa-dev \
     libxxf86vm-dev libembree-dev docker.io wget && \
     apt clean && rm -rf /var/lib/apt/lists/*
 
@@ -34,6 +36,15 @@ RUN git clone https://github.com/graphdeco-inria/gaussian-splatting --recursive
 
 # Installa Conda e crea l'ambiente
 WORKDIR /workspace/gaussian-splatting
+
+#COLMAP
+#
+RUN conda update -n base conda && \
+    conda install conda-forge::colmap
+
+##
+# Set the LD_LIBRARY_PATH
+##
 
 RUN conda env create --file environment.yml
 
