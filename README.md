@@ -1,3 +1,19 @@
+1) 
+# Rimuovi la vecchia versione
+sudo apt remove nodejs npm
+
+# Aggiungi il repository della versione LTS più recente
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+
+# Installa Node.js
+sudo apt-get install -y nodejs
+
+# Verifica la versione
+node --version  # Dovrebbe mostrare v20.x.x
+npm --version   # Dovrebbe mostrare la versione compatibile di npm
+
+
+
 1) Installa docker se non usi Docker Desktop
     sudo apt install -y docker
 
