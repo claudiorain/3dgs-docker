@@ -23,6 +23,17 @@ npm --version   # Dovrebbe mostrare la versione compatibile di npm
 3) Esegui docker-compose dalla root del progetto
    sudo docker-compose up --build
 
+4) 
+Accedi alla Console di AWS S3: Vai su AWS Management Console e accedi al tuo account AWS.
+
+Accedi al tuo bucket S3: Nel menu dei servizi, cerca "S3" e seleziona il servizio. Poi, nella lista dei tuoi bucket, seleziona il bucket su cui vuoi configurare CORS.
+
+Vai alla scheda "Permissions" (Autorizzazioni): Nella pagina del tuo bucket, clicca sulla scheda "Permissions" (Autorizzazioni) in alto.
+
+Configura il CORS: Nella sezione "Permissions", vedrai una sottosezione chiamata CORS configuration (Configurazione CORS). Clicca su Edit (Modifica) per modificare la configurazione.
+
+Aggiungi la configurazione CORS: Nella finestra di modifica, inserisci la configurazione CORS in formato XML. Ecco un esempio di configurazione CORS che consente l'accesso per il metodo PUT da tutti i domini (modifica i permessi come necessario per il tuo caso):
+
 Comandi utili:
 sudo docker-compose up -d --build: Effettua il build dell'applicazione
 docker logs <container_name_or_id>

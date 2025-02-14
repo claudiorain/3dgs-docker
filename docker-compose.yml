@@ -12,6 +12,10 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - MONGO_URI=mongodb://mongo:27017/3dgs_models
       - RABBITMQ_HOSTNAME=rabbitmq  # HOST RabbitMQ
       - RABBITMQ_PORT=5672  # HOST RabbitMQ
@@ -92,13 +96,16 @@ services:
   web-viewer:
     build:
       context: ./web-viewer
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev  # Usa il Dockerfile.dev per lo sviluppo
     container_name: web-viewer
     restart: always
     ports:
-      - "8080:80"
-    depends_on:
-      - api-gateway
+      - "5173:5173"  # Mappa la porta di Vite
+    volumes:
+      - ./web-viewer:/app  # Monta il codice locale dentro il container
+      - /app/node_modules  # Evita di sovrascrivere i moduli Node.js
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # Abilita hot reload su Docker
     networks:
       - my_network
       
