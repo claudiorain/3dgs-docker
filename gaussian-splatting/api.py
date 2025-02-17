@@ -37,7 +37,7 @@ def run_train(request: TrainRequest):
     print("Input directory:" + request.input_dir)
     print("Input directory:" + request.output_dir)
 
-    command = f"python /workspace/gaussian-splatting/train.py -s {request.input_dir} -m {request.output_dir} --densify_grad_threshold 0.001 --densification_interval 500 --densify_until_iter 7000 --test_iterations -1"
+    command = f"python /workspace/gaussian-splatting/train.py -s {request.input_dir} -m {request.output_dir} --densify_grad_threshold 0.0002 --densification_interval 100 --densify_until_iter 15000 --test_iterations 30000 --save_iterations 30000"
     
     process = subprocess.Popen(
         command, 
