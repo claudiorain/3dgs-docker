@@ -11,8 +11,6 @@ RUN mkdir -p /tmp/runtime-root && chmod 0700 /tmp/runtime-root
 ENV QT_QPA_PLATFORM=offscreen
 ENV PYTHONUNBUFFERED=1
 
-RUN conda install conda-forge::tensorboard
-
 # Installa le dipendenze necessarie (fastapi, uvicorn)
 RUN /bin/bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate gaussian_splatting && pip install fastapi uvicorn"
 
