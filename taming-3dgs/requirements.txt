@@ -1,0 +1,7 @@
+# Dipendenze di Conda (già incluse nell'ambiente)
+plyfile
+tqdm
+opencv-python
+joblib
+websockets
+

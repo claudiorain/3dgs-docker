@@ -13,52 +13,20 @@ RUN apt update && apt upgrade -y && apt install -y \
     libsqlite3-dev libglew-dev qtbase5-dev libqt5opengl5-dev libcgal-dev \
     gcc-10 g++-10 \
     libatlas-base-dev libsuitesparse-dev
-
-# Build and install Ceres Solver
+    
+# Clone Gaussian Splatting repository
 WORKDIR /workspace
-RUN git clone https://github.com/ceres-solver/ceres-solver.git
-WORKDIR /workspace/ceres-solver
-RUN git checkout 2.1.0 && \
-    mkdir build && cd build && \
-    CC=/usr/bin/gcc-10 \
-    CXX=/usr/bin/g++-10 \
-    cmake .. -GNinja \
-        -DBUILD_TESTING=OFF \
-        -DBUILD_EXAMPLES=OFF \
-        -DCMAKE_BUILD_TYPE=Release && \
-    ninja && \
-    ninja install && \
-    ldconfig
+RUN git clone https://github.com/humansensinglab/taming-3dgs.git --recursive
 
-    WORKDIR /workspace
-    RUN git clone https://github.com/colmap/colmap.git
-    WORKDIR /workspace/colmap
-    # Create build directory inside COLMAP directory
-    RUN mkdir build
-    WORKDIR /workspace/colmap/build
-    # Run cmake from inside the build directory
-    RUN CC=/usr/bin/gcc-10 \
-        CXX=/usr/bin/g++-10 \
-        CUDAHOSTCXX=/usr/bin/g++-10 \
-        cmake .. -GNinja \
-            -DCMAKE_CUDA_ARCHITECTURES="86;89" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX=/usr/local && \
-        ninja && \
-        ninja install
-
-WORKDIR /workspace
-RUN git clone  https://github.com/ubc-vision/3dgs-mcmc.git --recursive
-
-WORKDIR /workspace/3dgs-mcmc
+WORKDIR /workspace/taming-3dgs
 
 # Copy requirements
-COPY requirements.txt /workspace/3dgs-mcmc/
+COPY requirements.txt /workspace/taming-3dgs/
 
 # Install Python packages directly
 RUN pip3 install --upgrade pip && \
     pip3 install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu121
-   
+
 # Install other requirements
 RUN pip3 install -r requirements.txt
 
@@ -70,6 +38,7 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 # Build and install the submodules
 RUN cd submodules/diff-gaussian-rasterization && pip3 install .
 RUN cd submodules/simple-knn && pip3 install .
+RUN cd submodules/fused-ssim && pip3 install .
 
 # Start command
 CMD ["bash"]

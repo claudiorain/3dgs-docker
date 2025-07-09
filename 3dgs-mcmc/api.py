@@ -1,85 +1,317 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
+from typing import  Dict, Any
 import subprocess
-import sys
+import threading
+import queue
+import logging
+import os
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-class ConvertRequest(BaseModel):
-    input_dir: str  
 
 class TrainRequest(BaseModel):
     input_dir: str  
+    output_dir: str
+    params: Dict[str, Any] = Field(
+        default_factory=dict, 
+        description="Parametri specifici dell'algoritmo (generati auto se quality_level specificato)"
+    )  
+
+class RenderRequest(BaseModel):
     output_dir: str  
 
+class MetricsRequest(BaseModel):
+    output_dir: str  
 
 @app.get("/")
 def read_root():
     return {"message": "API is running!"}
 
-def log_output(pipe, log_func):
-    for line in iter(pipe.readline, b''):
-        log_func(line.strip())  # Già una stringa, quindi possiamo direttamente usarla
-        sys.stdout.flush()  # Assicurati di flushare subito l'output
+def stream_output(pipe, q):
+    """Read output from pipe and put it in queue"""
+    try:
+        for line in iter(pipe.readline, ''):
+            if line:
+                q.put(line.strip())
+    finally:
+        pipe.close()
 
-@app.post("/convert")
-def run_convert(request: ConvertRequest):
-    command = f"python /workspace/3dgs-mcmc/convert.py -s {request.input_dir}"
-    
-    print("Target directory:", request.input_dir)
-    process = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
+def log_from_queue(q, process):
+    """Log messages from queue until process completes"""
+    while process.poll() is None or not q.empty():
+        try:
+            line = q.get_nowait()
+            logger.info(line)
+        except queue.Empty:
+            continue
 
-    # Log output in tempo reale
-    from threading import Thread
-    stdout_thread = Thread(target=log_output, args=(process.stdout, print))
-    stderr_thread = Thread(target=log_output, args=(process.stderr, print))
-    
-    stdout_thread.start()
-    stderr_thread.start()
 
-    process.wait()  # Aspetta che il processo termini
-
-    # Assicurati che i thread terminino
-    stdout_thread.join()
-    stderr_thread.join()
-
-    if process.returncode != 0:  # Controlla se il comando è fallito
-        raise HTTPException(status_code=500, detail={"error": "Conversion failed", "stderr": "Process error"})
-
-    return {"message": "Conversion completed successfully"}
 
 @app.post("/train")
 def run_train(request: TrainRequest):
-    print("Input directory:", request.input_dir)
-    print("Output directory:", request.output_dir)
+    logger.info(f"Starting training - Input directory: {request.input_dir}")
+    logger.info(f"Output directory: {request.output_dir}")
+    logger.info(f"Training params: {request.params}")   
 
-    command = f"python /workspace/3dgs-mcmc/train.py -s {request.input_dir} -m {request.output_dir} --cap_max 1000000 --scale_reg 0.01 --opacity_reg 0.001 --noise_lr 5e5 --init_type sfm"
+    params = request.params
+
+    # Create the "sparse" directory under input_dir if it doesn't exist
+    sparse_dir = os.path.join(request.input_dir, "sparse")
+    if not os.path.exists(sparse_dir):
+        os.makedirs(sparse_dir)
+        logger.info(f"Created sparse directory at {sparse_dir}")
     
+    command = ["python3", "/workspace/3dgs-mcmc/train.py"  ]
+    command.extend([
+        "--init_type", "sfm",
+        "-s", request.input_dir,
+        "-m", request.output_dir
+    ])
+
+    # Tutti gli altri parametri automaticamente
+    boolean_flags = {"eval"}  # Flag senza valori
+    
+    for param_key, value in params.items():
+        if param_key in boolean_flags:
+            # Flag booleani
+            if value:
+                command.append(f"--{param_key}")
+        else:
+            # Parametri normali con valore
+            command.extend([f"--{param_key}", str(value)])
+    
+    logger.info(f"Command: {' '.join(command)}")
+    
+    # Create process with pipes
     process = subprocess.Popen(
-        command, 
-        shell=True, 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.PIPE, 
-        text=True  
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,  # Line buffered
     )
 
-    # Log output in tempo reale
-    from threading import Thread
-    stdout_thread = Thread(target=log_output, args=(process.stdout, print))
-    stderr_thread = Thread(target=log_output, args=(process.stderr, print))
-    
+    # Create queues for stdout and stderr
+    stdout_queue = queue.Queue()
+    stderr_queue = queue.Queue()
+
+    # Create and start output reader threads
+    stdout_thread = threading.Thread(
+        target=stream_output, 
+        args=(process.stdout, stdout_queue)
+    )
+    stderr_thread = threading.Thread(
+        target=stream_output, 
+        args=(process.stderr, stderr_queue)
+    )
+
+    # Create and start logging threads
+    stdout_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stdout_queue, process)
+    )
+    stderr_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stderr_queue, process)
+    )
+
+    # Start all threads
     stdout_thread.start()
     stderr_thread.start()
+    stdout_log_thread.start()
+    stderr_log_thread.start()
 
-    process.wait()  # Aspetta che il processo termini
+    try:
+        # Wait for process to complete with timeout
+        process.wait()
 
-    # Assicurati che i thread terminino
-    stdout_thread.join()
-    stderr_thread.join()
+        # Wait for threads to finish
+        stdout_thread.join()
+        stderr_thread.join()
+        stdout_log_thread.join()
+        stderr_log_thread.join()
 
-    if process.returncode != 0:  # Controlla se il comando è fallito
-        raise HTTPException(status_code=500, detail={"error": "Training failed", "stderr": "Process error"})
+        if process.returncode != 0:
+            error_message = "Training failed"
+            logger.error(error_message)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": error_message, "stderr": "Process error"}
+            )
 
-    return {"message": "Training completed successfully"}
+        logger.info("Training completed successfully")
+        return {"message": "Training completed successfully"}
+
+    except Exception as e:
+        logger.error(f"Unexpected error during training: {str(e)}")
+        # Ensure process is terminated if something goes wrong
+        process.kill()
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Training failed", "stderr": str(e)}
+        )
+
+@app.post("/render")
+async def run_render(request: RenderRequest):
+    logger.info(f"Output directory: {request.output_dir}")
+
+    command = f"python3 /workspace/3dgs-mcmc/render.py -m {request.output_dir}"
+
+    
+    # Create process with pipes
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,  # Line buffered
+    )
+
+    # Create queues for stdout and stderr
+    stdout_queue = queue.Queue()
+    stderr_queue = queue.Queue()
+
+    # Create and start output reader threads
+    stdout_thread = threading.Thread(
+        target=stream_output, 
+        args=(process.stdout, stdout_queue)
+    )
+    stderr_thread = threading.Thread(
+        target=stream_output, 
+        args=(process.stderr, stderr_queue)
+    )
+
+    # Create and start logging threads
+    stdout_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stdout_queue, process)
+    )
+    stderr_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stderr_queue, process)
+    )
+
+    # Start all threads
+    stdout_thread.start()
+    stderr_thread.start()
+    stdout_log_thread.start()
+    stderr_log_thread.start()
+
+    try:
+        # Wait for process to complete with timeout
+        process.wait()
+
+        # Wait for threads to finish
+        stdout_thread.join()
+        stderr_thread.join()
+        stdout_log_thread.join()
+        stderr_log_thread.join()
+
+        if process.returncode != 0:
+            error_message = "Render failed"
+            logger.error(error_message)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": error_message, "stderr": "Process error"}
+            )
+
+        logger.info("Render completed successfully")
+        return {"message": "Render completed successfully"}
+
+    except Exception as e:
+        logger.error(f"Unexpected error during render: {str(e)}")
+        # Ensure process is terminated if something goes wrong
+        process.kill()
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Render failed", "stderr": str(e)}
+        )
+
+@app.post("/metrics")
+async def run_render(request: MetricsRequest):
+    logger.info(f"Output directory: {request.output_dir}")
+
+    command = f"python3 /workspace/3dgs-mcmc/metrics.py -m {request.output_dir}"
+
+    
+    # Create process with pipes
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,  # Line buffered
+    )
+
+    # Create queues for stdout and stderr
+    stdout_queue = queue.Queue()
+    stderr_queue = queue.Queue()
+
+    # Create and start output reader threads
+    stdout_thread = threading.Thread(
+        target=stream_output, 
+        args=(process.stdout, stdout_queue)
+    )
+    stderr_thread = threading.Thread(
+        target=stream_output, 
+        args=(process.stderr, stderr_queue)
+    )
+
+    # Create and start logging threads
+    stdout_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stdout_queue, process)
+    )
+    stderr_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stderr_queue, process)
+    )
+
+    # Start all threads
+    stdout_thread.start()
+    stderr_thread.start()
+    stdout_log_thread.start()
+    stderr_log_thread.start()
+
+    try:
+        # Wait for process to complete with timeout
+        process.wait()
+
+        # Wait for threads to finish
+        stdout_thread.join()
+        stderr_thread.join()
+        stdout_log_thread.join()
+        stderr_log_thread.join()
+
+        if process.returncode != 0:
+            error_message = "Generating metrics failed"
+            logger.error(error_message)
+            raise HTTPException(
+                status_code=500,
+                detail={"error": error_message, "stderr": "Process error"}
+            )
+
+        logger.info("Metrics generated successfully")
+        return {"message": "Metrics generated successfully"}
+
+    except Exception as e:
+        logger.error(f"Unexpected error during metrics generation: {str(e)}")
+        # Ensure process is terminated if something goes wrong
+        process.kill()
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Generating metrics failed", "stderr": str(e)}
+        )
+
+
+   

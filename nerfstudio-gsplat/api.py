@@ -1,10 +1,9 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel,Field
+from pydantic import BaseModel
 import subprocess
 import threading
 import queue
 import logging
-from typing import  Dict, Any
 
 app = FastAPI()
 
@@ -15,14 +14,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class ConvertRequest(BaseModel):
+    input_dir: str
 
 class TrainRequest(BaseModel):
     input_dir: str  
-    output_dir: str
-    params: Dict[str, Any] = Field(
-        default_factory=dict, 
-        description="Parametri specifici dell'algoritmo (generati auto se quality_level specificato)"
-    )  
+    output_dir: str  
+    train_type: str
+
 
 class RenderRequest(BaseModel):
     output_dir: str  
@@ -48,115 +47,15 @@ def log_from_queue(q, process):
         except queue.Empty:
             continue
 
+
 @app.post("/train")
 async def run_train(request: TrainRequest):
     logger.info(f"Starting training - Input directory: {request.input_dir}")
     logger.info(f"Output directory: {request.output_dir}")
-    logger.info(f"Training params: {request.params}")   
+    logger.info(f"Train type: {request.train_type}")
+    command = f"CUDA_VISIBLE_DEVICES=0 python3 /workspace/gaussian-splatting/examples/simple_trainer.py {request.train_type} --data_dir {request.input_dir} --data_factor 1 --result_dir {request.output_dir} "
+
     
-    params = request.params
-
-    # ✅ Fix: Inizializza come LISTA
-    command = ["python3", "/workspace/gaussian-splatting/train.py"]
- 
-    # Parametri obbligatori
-    command.extend([
-        "-s", request.input_dir,
-        "-m", request.output_dir
-    ])
-
-    # Tutti gli altri parametri automaticamente
-    boolean_flags = {"eval"}  # Flag senza valori
-    
-    for param_key, value in params.items():
-        if param_key in boolean_flags:
-            # Flag booleani
-            if value:
-                command.append(f"--{param_key}")
-        else:
-            # Parametri normali con valore
-            command.extend([f"--{param_key}", str(value)])
-    
-    logger.info(f"Command: {' '.join(command)}")
-    
-    # ✅ Fix: Rimuovi shell=True quando usi lista
-    process = subprocess.Popen(
-        command,  # Lista invece di stringa
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-    )
-
-    # Create queues for stdout and stderr
-    stdout_queue = queue.Queue()
-    stderr_queue = queue.Queue()
-
-    # Create and start output reader threads
-    stdout_thread = threading.Thread(
-        target=stream_output, 
-        args=(process.stdout, stdout_queue)
-    )
-    stderr_thread = threading.Thread(
-        target=stream_output, 
-        args=(process.stderr, stderr_queue)
-    )
-
-    # Create and start logging threads
-    stdout_log_thread = threading.Thread(
-        target=log_from_queue,
-        args=(stdout_queue, process)
-    )
-    stderr_log_thread = threading.Thread(
-        target=log_from_queue,
-        args=(stderr_queue, process)
-    )
-
-    # Start all threads
-    stdout_thread.start()
-    stderr_thread.start()
-    stdout_log_thread.start()
-    stderr_log_thread.start()
-
-    try:
-        # Wait for process to complete with timeout
-        process.wait()
-
-        # Wait for threads to finish
-        stdout_thread.join()
-        stderr_thread.join()
-        stdout_log_thread.join()
-        stderr_log_thread.join()
-
-        if process.returncode != 0:
-            error_message = "Training failed"
-            logger.error(error_message)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": error_message, "stderr": "Process error"}
-            )
-
-        logger.info("Training completed successfully")
-        return {"message": "Training completed successfully"}
-
-    except Exception as e:
-        logger.error(f"Unexpected error during training: {str(e)}")
-        # Ensure process is terminated if something goes wrong
-        process.kill()
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "Training failed", "stderr": str(e)}
-        )
-
-@app.post("/make_depth_scale")
-async def run_train(request: TrainRequest):
-    logger.info(f"Starting training - Input directory: {request.input_dir}")
-    logger.info(f"Output directory: {request.output_dir}")
-
-    command = f"python3 /workspace/gaussian-splatting/utils/make_depth_scale.py --base_dir {request.input_dir} --depths_dir {request.input_dir}/depth_maps"
-    
-    
- 
     # Create process with pipes
     process = subprocess.Popen(
         command,
@@ -226,7 +125,8 @@ async def run_train(request: TrainRequest):
             status_code=500,
             detail={"error": "Training failed", "stderr": str(e)}
         )
-    
+
+
 @app.post("/render")
 async def run_render(request: RenderRequest):
     logger.info(f"Output directory: {request.output_dir}")

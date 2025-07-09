@@ -1,10 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel,Field
+from typing import  Dict, Any
 import subprocess
 import threading
 import queue
 import logging
-from typing import  Dict, Any
 
 app = FastAPI()
 
@@ -14,7 +14,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
 
 class TrainRequest(BaseModel):
     input_dir: str  
@@ -29,6 +28,7 @@ class RenderRequest(BaseModel):
 
 class MetricsRequest(BaseModel):
     output_dir: str  
+
 
 def stream_output(pipe, q):
     """Read output from pipe and put it in queue"""
@@ -53,21 +53,16 @@ async def run_train(request: TrainRequest):
     logger.info(f"Starting training - Input directory: {request.input_dir}")
     logger.info(f"Output directory: {request.output_dir}")
     logger.info(f"Training params: {request.params}")   
-    
-    params = request.params
 
-    # ✅ Fix: Inizializza come LISTA
-    command = ["python3", "/workspace/gaussian-splatting/train.py"]
- 
-    # Parametri obbligatori
+    params = request.params
+    command = ["python3", "/workspace/taming-3dgs/train.py"]
     command.extend([
         "-s", request.input_dir,
         "-m", request.output_dir
     ])
-
-    # Tutti gli altri parametri automaticamente
-    boolean_flags = {"eval"}  # Flag senza valori
     
+    # Tutti gli altri parametri automaticamente
+    boolean_flags = {"eval","sh_lower"}  # Flag senza valori
     for param_key, value in params.items():
         if param_key in boolean_flags:
             # Flag booleani
@@ -76,16 +71,13 @@ async def run_train(request: TrainRequest):
         else:
             # Parametri normali con valore
             command.extend([f"--{param_key}", str(value)])
-    
-    logger.info(f"Command: {' '.join(command)}")
-    
-    # ✅ Fix: Rimuovi shell=True quando usi lista
+            
     process = subprocess.Popen(
-        command,  # Lista invece di stringa
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
+    command,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,  # <-- garantisce modalità testo
+    bufsize=1,  # line buffering
     )
 
     # Create queues for stdout and stderr
@@ -148,90 +140,12 @@ async def run_train(request: TrainRequest):
             detail={"error": "Training failed", "stderr": str(e)}
         )
 
-@app.post("/make_depth_scale")
-async def run_train(request: TrainRequest):
-    logger.info(f"Starting training - Input directory: {request.input_dir}")
-    logger.info(f"Output directory: {request.output_dir}")
 
-    command = f"python3 /workspace/gaussian-splatting/utils/make_depth_scale.py --base_dir {request.input_dir} --depths_dir {request.input_dir}/depth_maps"
-    
-    
- 
-    # Create process with pipes
-    process = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,  # Line buffered
-    )
-
-    # Create queues for stdout and stderr
-    stdout_queue = queue.Queue()
-    stderr_queue = queue.Queue()
-
-    # Create and start output reader threads
-    stdout_thread = threading.Thread(
-        target=stream_output, 
-        args=(process.stdout, stdout_queue)
-    )
-    stderr_thread = threading.Thread(
-        target=stream_output, 
-        args=(process.stderr, stderr_queue)
-    )
-
-    # Create and start logging threads
-    stdout_log_thread = threading.Thread(
-        target=log_from_queue,
-        args=(stdout_queue, process)
-    )
-    stderr_log_thread = threading.Thread(
-        target=log_from_queue,
-        args=(stderr_queue, process)
-    )
-
-    # Start all threads
-    stdout_thread.start()
-    stderr_thread.start()
-    stdout_log_thread.start()
-    stderr_log_thread.start()
-
-    try:
-        # Wait for process to complete with timeout
-        process.wait()
-
-        # Wait for threads to finish
-        stdout_thread.join()
-        stderr_thread.join()
-        stdout_log_thread.join()
-        stderr_log_thread.join()
-
-        if process.returncode != 0:
-            error_message = "Training failed"
-            logger.error(error_message)
-            raise HTTPException(
-                status_code=500,
-                detail={"error": error_message, "stderr": "Process error"}
-            )
-
-        logger.info("Training completed successfully")
-        return {"message": "Training completed successfully"}
-
-    except Exception as e:
-        logger.error(f"Unexpected error during training: {str(e)}")
-        # Ensure process is terminated if something goes wrong
-        process.kill()
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "Training failed", "stderr": str(e)}
-        )
-    
 @app.post("/render")
 async def run_render(request: RenderRequest):
     logger.info(f"Output directory: {request.output_dir}")
 
-    command = f"python3 /workspace/gaussian-splatting/render.py -m {request.output_dir}"
+    command = f"python3 /workspace/taming-3dgs/render.py -m {request.output_dir}"
 
     
     # Create process with pipes
@@ -308,7 +222,7 @@ async def run_render(request: RenderRequest):
 async def run_render(request: MetricsRequest):
     logger.info(f"Output directory: {request.output_dir}")
 
-    command = f"python3 /workspace/gaussian-splatting/metrics.py -m {request.output_dir}"
+    command = f"python3 /workspace/taming-3dgs/metrics.py -m {request.output_dir}"
 
     
     # Create process with pipes
