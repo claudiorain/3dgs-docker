@@ -1,14 +1,6 @@
 services:
 
-  gdrive-api:
-    build: ./gdrive-api  # Il percorso della cartella dove hai creato il Dockerfile
-    container_name: gdrive-api
-    ports:
-      - "8090:8090"  # Espone la porta 8090 per FastAPI
-    volumes:
-      - ./gdrive-api/credentials.json:/app/credentials.json  # Monta il file delle credenziali nel container
-    networks:
-      - my_network
+  
   api-gateway:  # Cambiato da "app" a "api-gateway"
     build:
       context: ./api-gateway  # Cartella di build per api-gateway
@@ -59,15 +51,25 @@ services:
       - RABBITMQ_USER=${RABBIT_MQ_USER_READER}
       - RABBITMQ_PASS=${RABBIT_MQ_PASS_READER}
       - MODEL_WORKING_DIR=${MODEL_WORKING_DIR}
+      - NVIDIA_VISIBLE_DEVICES=all  # Rende visibili tutte le GPU
     restart: always
     networks:
       - my_network
-  gaussian-splatting-base:  # Cambiato da "app" a "api-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Usa una GPU
+              capabilities: [gpu]
+
+
+  gaussian-splatting:  # Cambiato da "app" a "api-gateway"
     build:
       context: ./gaussian-splatting  # Cartella di build per api-gateway
       dockerfile: Dockerfile.base  # Usa Dockerfile.base per costruire l'immagin
-    container_name: gaussian-splatting-base
-    image: gaussian-splatting-base  # 👈 Aggiungi questa riga
+    container_name: gaussian-splatting
+    image: gaussian-splatting  # 👈 Aggiungi questa riga
     networks:
       - my_network
     deploy:
@@ -82,21 +84,142 @@ services:
     build:
       context: ./gaussian-splatting  # Nuovo servizio API per Gaussian Splatting
       dockerfile: Dockerfile
+      args:
+      - API_PORT=${GAUSSIAN_SPLATTING_PORT:-8100}
     container_name: gaussian-splatting-api
     volumes:
       - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
       - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
     ports:
-      - "8050:8050"  # Espone l'API sulla porta 8050
+      - "${GAUSSIAN_SPLATTING_PORT:-8100}:${GAUSSIAN_SPLATTING_PORT:-8100}"
     depends_on:
-      - gaussian-splatting-base
+      - gaussian-splatting
     environment:
-      - MODEL_WORKING_DIR=/app/shared_data
-      - GAUSSIAN_SPLATTING_HOST=gaussian-splatting
+      - API_PORT=${GAUSSIAN_SPLATTING_PORT:-8100}
+      - MODEL_WORKING_DIR=${MODEL_WORKING_DIR}
       - XDG_RUNTIME_DIR=/tmp/runtime-root
       - DISPLAY=${DISPLAY}  # Usa il DISPLAY del sistema host
     networks:
     - my_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Usa tutte le GPU disponibili
+              capabilities: [gpu]
+
+  3dgs-mcmc:  # Cambiato da "app" a "api-gateway"
+    build:
+      context: ./3dgs-mcmc  # Cartella di build per api-gateway
+      dockerfile: Dockerfile.base  # Usa Dockerfile.base per costruire l'immagin
+    container_name: 3dgs-mcmc
+    image: 3dgs-mcmc  # 👈 Aggiungi questa riga
+    networks:
+      - my_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Usa tutte le GPU disponibili
+              capabilities: [gpu]
+
+  3dgs-mcmc-api:
+    build:
+      context: ./3dgs-mcmc  # Nuovo servizio API per Gaussian Splatting
+      dockerfile: Dockerfile
+      args:
+      - API_PORT=${MCMC_PORT:-8100}
+    container_name: 3dgs-mcmc-api
+    volumes:
+      - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
+      - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
+    ports:
+      - "${MCMC_PORT:-8100}:${MCMC_PORT:-8100}"
+    depends_on:
+      - 3dgs-mcmc
+    mem_limit: 20G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
+    memswap_limit: 24G  # Limite di memoria + swap a 36 GB
+    environment:
+      - API_PORT=${MCMC_PORT:-8101}
+      - MODEL_WORKING_DIR=/app/shared_data
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+      - DISPLAY=${DISPLAY}  # Usa il DISPLAY del sistema host
+    networks:
+    - my_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Usa tutte le GPU disponibili
+              capabilities: [gpu]
+
+  taming-3dgs:  # Cambiato da "app" a "api-gateway"
+    build:
+      context: ./taming-3dgs  # Cartella di build per api-gateway
+      dockerfile: Dockerfile.base  # Usa Dockerfile.base per costruire l'immagin
+    container_name: taming-3dgs
+    image: taming-3dgs  # 👈 Aggiungi questa riga
+    networks:
+      - my_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Usa tutte le GPU disponibili
+              capabilities: [gpu]
+
+  taming-3dgs-api:
+    build:
+      context: ./taming-3dgs  # Nuovo servizio API per Gaussian Splatting
+      dockerfile: Dockerfile
+      args:
+      - API_PORT=${TAMING_PORT:-8100}
+    container_name: taming-3dgs-api
+    
+    mem_limit: 20G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
+    memswap_limit: 24G  # Limite di memoria + swap a 36 GB
+    volumes:
+      - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
+      - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
+    ports:
+    - "${TAMING_PORT:-8100}:${TAMING_PORT:-8100}"
+    depends_on:
+      - taming-3dgs
+    environment:
+      - API_PORT=${TAMING_PORT:-8102}
+      - MODEL_WORKING_DIR=/app/shared_data
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+      - DISPLAY=${DISPLAY}  # Usa il DISPLAY del sistema host
+    networks:
+    - my_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Usa tutte le GPU disponibili
+              capabilities: [gpu]
+
+  colmap-converter-api:  # Cambiato da "app" a "api-gateway"
+    build:
+      context: ./colmap-converter  # Cartella di build per api-gateway
+      dockerfile: Dockerfile  # Usa Dockerfile.base per costruire l'immagin
+    container_name: colmap-converter-api
+    volumes:
+      - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
+      - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
+    image: colmap-converter  # 👈 Aggiungi questa riga
+    ports:
+      - "8060:8060"  # Espone l'API sulla porta 8060
+    networks:
+      - my_network
+    environment:
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+      - DISPLAY=${DISPLAY}  # Usa il DISPLAY del sistema host
     deploy:
       resources:
         reservations:
