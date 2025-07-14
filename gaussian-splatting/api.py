@@ -61,6 +61,7 @@ async def run_train(request: TrainRequest):
  
     # Parametri obbligatori
     command.extend([
+        "--resolution", "1",
         "-s", request.input_dir,
         "-m", request.output_dir
     ])
@@ -73,7 +74,7 @@ async def run_train(request: TrainRequest):
             # Flag booleani
             if value:
                 command.append(f"--{param_key}")
-        else:
+        elif param_key != 'resolution':
             # Parametri normali con valore
             command.extend([f"--{param_key}", str(value)])
     

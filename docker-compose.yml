@@ -139,8 +139,9 @@ services:
       - "${MCMC_PORT:-8100}:${MCMC_PORT:-8100}"
     depends_on:
       - 3dgs-mcmc
-    mem_limit: 20G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
-    memswap_limit: 24G  # Limite di memoria + swap a 36 GB
+    mem_limit: 20G
+    memswap_limit: 32G  # Più swap per GPU intensive tasks
+    mem_swappiness: 60  # Meno aggressivo per performance GPU
     environment:
       - API_PORT=${MCMC_PORT:-8101}
       - MODEL_WORKING_DIR=/app/shared_data
@@ -251,6 +252,7 @@ services:
   mongo:
     image: mongo
     container_name: mongo
+    command: mongod --replSet rs0 --bind_ip_all
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
     ports:
@@ -261,6 +263,29 @@ services:
       - my_network
     environment:
       - MONGO_INITDB_DATABASE=3d_gaussian_splatting
+    
+  # Servizio separato per inizializzare il replica set
+  mongo-setup:
+    image: mongo:5.0
+    container_name: mongo-setup
+    depends_on:
+      mongo:
+        condition: service_healthy  # Aspetta che mongo sia healthy
+    networks:
+      - my_network
+    command: |
+      mongosh --host mongo:27017 --eval "
+      try {
+        rs.status();
+        print('Replica set already initialized');
+      } catch(e) {
+        rs.initiate({
+          _id: 'rs0',
+          members: [{ _id: 0, host: 'mongo:27017' }]
+        });
+        print('Replica set initialized');
+      }"
+    restart: "no"
 
   rabbitmq:
     image: "rabbitmq:3-management"  # Usa l'immagine RabbitMQ con interfaccia di gestione

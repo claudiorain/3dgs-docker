@@ -21,108 +21,84 @@ db.training_params.insertOne({
    "notes": "Parametri ottimizzati per migliore qualità. densify_grad_threshold aumentato, percent_dense aumentato, lambda_dssim ridotto"
  },
  
- // === PARAMETRI ESSENZIALI OTTIMIZZATI ===
  "base_params": {
-   "iterations": 30000,
-   "cams": 15,                           // ✅ AUMENTATO da 10 a 20
-   "budget": 1500000,                     // ✅ RIDOTTO da 1M a 800k per stabilità
-   "mode": "final_count",
-   "ho_iteration": 17000,
-   "test_iterations": -1,
-   
-   // === PARAMETRI DENSIFICATION OTTIMIZZATI ===
-   "densify_from_iter": 500,
-   "densify_until_iter": 15000,
-   "densification_interval": 100,
-   "densify_grad_threshold": 0.0002,     // ✅ AUMENTATO da 0.0002 a 0.0005
-   "percent_dense": 0.01,                // ✅ AUMENTATO da 0.01 a 0.05
-   
-   // === PARAMETRI LEARNING RATE ===
-   "opacity_lr":0.025,
-   "scaling_lr": 0.005,
-   "rotation_lr": 0.001,
-   "position_lr_init": 0.00016,
-   "position_lr_delay_mult": 0.01,
-   
-   // === PARAMETRI LOSS OTTIMIZZATI ===
-   "lambda_dssim": 0.2,                  // ✅ RIDOTTO da 0.2 a 0.1
-   "sh_degree": 3,
-   
-   "eval": true
- },
- 
+    "iterations": 30000,
+    "cams": 15, 
+    "budget": 1500000,     
+    "mode": "final_count",
+    "ho_iteration": 17000,
+    "densify_grad_threshold": 0.0002,
+    "densification_interval": 100,
+    "densify_from_iter": 500,
+    "densify_until_iter": 15000,
+    "opacity_lr": 0.05,
+    "scaling_lr": 0.005,
+    "rotation_lr": 0.001,
+    "percent_dense": 0.01,                // ✅ AUMENTATO da 0.01 a 0.05
+    "eval": true
+  },
+
  // === MOLTIPLICATORI OTTIMIZZATI ===
  "quality_multipliers": {
-   "draft": {
-     "cams": 0.5,                        // ✅ 10 cameras per draft
-     "iterations": 1.0,
-     "budget": 0.60,                     // ✅ 480k gaussians
+   "fast": {
+     "budget": 0.75,                     // ✅ 480k gaussians
      "test_iterations": 1.0,
      "densify_from_iter": 1.0,
      "densify_grad_threshold": 1.2,      // ✅ Soglia più permissiva per draft
      "percent_dense": 0.8                // ✅ Meno denso per draft
    },
-   "standard": {
-     "cams": 1.0,                        // ✅ 20 cameras
-     "iterations": 1.0,
+   "balanced": {
      "budget": 1.0,                      // ✅ 800k gaussians
      "test_iterations": 1.0,
      "densify_from_iter": 1.0,
-     "densify_grad_threshold": 1.0,
-     "percent_dense": 1.0
+     "densify_grad_threshold": 1.0
    },
-   "high": {
-     "cams": 1.5,                        // ✅ 30 cameras
-     "iterations": 1.0,
+   "quality": {
      "budget": 1.25,                     // ✅ 1M gaussians
      "test_iterations": 1.0,
      "densify_from_iter": 1.0,
-     "densify_grad_threshold": 0.8,      // ✅ Soglia più stringente per high
-     "percent_dense": 1.2
-   },
-   "ultra": {
-     "cams": 2.0,                        // ✅ 40 cameras
-     "iterations": 1.0,
-     "budget": 1.50,                     // ✅ 1.2M gaussians
-     "test_iterations": 1.0,
-     "densify_from_iter": 1.0,
-     "densify_grad_threshold": 0.6,      // ✅ Soglia ancora più stringente
-     "percent_dense": 1.4
+     "densify_grad_threshold": 0.8      // ✅ Soglia più stringente per high
    }
  },
  
  // === OVERRIDE RESOLUTION ===
- "quality_overrides": {
-   "draft": {
-     "resolution": -1
-   },
-   "standard": {
-     "resolution": 1
-   },
-   "high": {
-     "resolution": 1
-   },
-   "ultra": {
-     "resolution": 1
-   }
- },
+  "quality_overrides": {
+    "fast": {
+      "resolution": 4
+    },
+    "balanced": {
+      "resolution": 2
+    },
+    "quality": {
+      "resolution": 1
+    }
+  },
  
  // === HARDWARE CONFIG ===
  "hardware_config": {
    "baseline_vram_gb": 20,
    "min_vram_gb": 8,
    "resolution_thresholds": [
-     { "vram_threshold": 20, "resolution": 1, "description": "Full resolution" },
-     { "vram_threshold": 8, "resolution": 4, "description": "Quarter resolution" }
-   ],
+      { "vram_threshold": 24, "resolution": 1, "description": "Full resolution (24GB+)" },
+      { "vram_threshold": 16, "resolution": 4, "description": "Full resolution (16GB+)" },
+      { "vram_threshold": 8, "resolution": 8, "description": "Quarter resolution (8GB+)" }
+    ],
    "scaling_formulas": {
-     // ❌ RIMOSSO: scaling per densification (causa IndexError)
-   }
- },
- 
- // === NESSUN POST CALCULATION ===
- "post_calculation": {},
- 
+      "densify_grad_threshold": {
+        "formula": "max(1.8, 4.0 - (vram_factor * 2.2))",
+        "description": "Scaling uniforme basato solo su VRAM disponibile",
+        "min": 1.8,
+        "max": 4.0
+      },
+      "budget": {
+        "formula": "max(0.6, 0.5 + (vram_factor * 0.5))",
+        "description": "Scaling bilanciato gaussiane massime",
+        "min": 0.6,
+        "max": 1.2
+      }
+ }
+},
+
  // === VALIDAZIONE OTTIMIZZATA ===
  "validation_rules": [
    {
