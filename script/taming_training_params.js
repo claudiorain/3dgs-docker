@@ -22,17 +22,17 @@ db.training_params.insertOne({
  },
  
  "base_params": {
-    "iterations": 30000,
-    "cams": 15, 
+    "iterations": 35000,
+    "cams": 20, 
     "budget": 1500000,     
     "mode": "final_count",
-    "ho_iteration": 17000,
+    "ho_iteration": 16000,
     "densify_grad_threshold": 0.0002,
     "densification_interval": 100,
     "densify_from_iter": 500,
     "densify_until_iter": 15000,
     "opacity_lr": 0.05,
-    "scaling_lr": 0.005,
+    "scaling_lr": 0.01,
     "rotation_lr": 0.001,
     "percent_dense": 0.01,                // ✅ AUMENTATO da 0.01 a 0.05
     "eval": true
@@ -42,21 +42,15 @@ db.training_params.insertOne({
  "quality_multipliers": {
    "fast": {
      "budget": 0.75,                     // ✅ 480k gaussians
-     "test_iterations": 1.0,
-     "densify_from_iter": 1.0,
      "densify_grad_threshold": 1.2,      // ✅ Soglia più permissiva per draft
      "percent_dense": 0.8                // ✅ Meno denso per draft
    },
    "balanced": {
      "budget": 1.0,                      // ✅ 800k gaussians
-     "test_iterations": 1.0,
-     "densify_from_iter": 1.0,
      "densify_grad_threshold": 1.0
    },
    "quality": {
-     "budget": 1.25,                     // ✅ 1M gaussians
-     "test_iterations": 1.0,
-     "densify_from_iter": 1.0,
+     "budget": 1.5,                     // ✅ 1M gaussians
      "densify_grad_threshold": 0.8      // ✅ Soglia più stringente per high
    }
  },
@@ -133,4 +127,5 @@ console.log("   - densify_grad_threshold: 0.0005 (da 0.0002)");
 console.log("   - percent_dense: 0.05 (da 0.01)");
 console.log("   - lambda_dssim: 0.1 (da 0.2)");
 console.log("   - budget: 800k (da 1M per stabilità)");
+console.log("⚠️  densify_until_iter = 15k (stabile)");
 console.log("⚠️  densify_until_iter = 15k (stabile)");

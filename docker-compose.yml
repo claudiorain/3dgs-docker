@@ -87,6 +87,8 @@ services:
       args:
       - API_PORT=${GAUSSIAN_SPLATTING_PORT:-8100}
     container_name: gaussian-splatting-api
+    mem_limit: 20G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
+    memswap_limit: 32G  # Limite di memoria + swap a 36 GB
     volumes:
       - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
       - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
@@ -182,7 +184,7 @@ services:
     container_name: taming-3dgs-api
     
     mem_limit: 20G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
-    memswap_limit: 24G  # Limite di memoria + swap a 36 GB
+    memswap_limit: 32G  # Limite di memoria + swap a 36 GB
     volumes:
       - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
       - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
