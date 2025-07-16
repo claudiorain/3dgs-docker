@@ -32,68 +32,23 @@ class RenderRequest(BaseModel):
 class MetricsRequest(BaseModel):
     output_dir: str  
 
-@app.get("/")
-def read_root():
-    return {"message": "API is running!"}
-
-def stream_output(pipe, q, stream_name):
+def stream_output(pipe, q):
     """Read output from pipe and put it in queue"""
     try:
-        logger.info(f"Starting {stream_name} stream reader")
         for line in iter(pipe.readline, ''):
             if line:
-                q.put((stream_name, line.strip()))
-        logger.info(f"Finished {stream_name} stream reader")
-    except Exception as e:
-        logger.error(f"Error in {stream_name} stream reader: {e}")
-        q.put((stream_name, f"STREAM_ERROR: {e}"))
+                q.put(line.strip())
     finally:
         pipe.close()
 
-def log_from_queue(q, process, error_lines):
+def log_from_queue(q, process):
     """Log messages from queue until process completes"""
-    logger.info("Starting queue logger")
-    last_stdout_time = time.time()
-    iteration_count = 0
-    
-    while True:
+    while process.poll() is None or not q.empty():
         try:
-            # Check if process is still running or queue has items
-            if process.poll() is not None and q.empty():
-                break
-                
-            try:
-                stream_name, line = q.get(timeout=2.0)
-                current_time = time.time()
-                
-                if stream_name == "stderr":
-                    logger.error(f"STDERR [{current_time:.1f}s]: {line}")
-                    error_lines.append(line)
-                else:
-                    # Parse training progress per monitoraggio
-                    if "Training progress:" in line:
-                        iteration_count += 1
-                        last_stdout_time = current_time
-                        if iteration_count % 100 == 0:  # Log ogni 100 iterazioni
-                            logger.info(f"PROGRESS [{iteration_count}]: {line}")
-                    elif any(keyword in line for keyword in ["ITER", "Evaluating", "Saving", "Error", "Exception", "Traceback"]):
-                        logger.info(f"STDOUT [{current_time:.1f}s]: {line}")
-                        last_stdout_time = current_time
-                    # Skip normale training progress logging per ridurre spam
-                        
-            except queue.Empty:
-                current_time = time.time()
-                # Se non riceviamo output da più di 30 secondi, potrebbe essere un hang
-                if current_time - last_stdout_time > 30:
-                    logger.warning(f"No output received for {current_time - last_stdout_time:.1f} seconds")
-                    last_stdout_time = current_time
-                continue
-                
-        except Exception as e:
-            logger.error(f"Error in queue logger: {e}")
-            break
-    
-    logger.info(f"Queue logger finished. Total iterations logged: {iteration_count}")
+            line = q.get_nowait()
+            logger.info(line)
+        except queue.Empty:
+            continue
 
 @app.post("/train")
 def run_train(request: TrainRequest):
@@ -148,139 +103,64 @@ def run_train(request: TrainRequest):
             detail={"error": "Failed to start training process", "stderr": str(e)}
         )
 
-    # Create queue for both stdout and stderr
-    output_queue = queue.Queue()
-    error_lines = []  # Collect error lines
+     # Create queues for stdout and stderr
+    stdout_queue = queue.Queue()
+    stderr_queue = queue.Queue()
 
     # Create and start output reader threads
     stdout_thread = threading.Thread(
         target=stream_output, 
-        args=(process.stdout, output_queue, "stdout")
+        args=(process.stdout, stdout_queue)
     )
     stderr_thread = threading.Thread(
         target=stream_output, 
-        args=(process.stderr, output_queue, "stderr")
+        args=(process.stderr, stderr_queue)
     )
 
-    # Create and start logging thread
-    log_thread = threading.Thread(
+    # Create and start logging threads
+    stdout_log_thread = threading.Thread(
         target=log_from_queue,
-        args=(output_queue, process, error_lines)
+        args=(stdout_queue, process)
+    )
+    stderr_log_thread = threading.Thread(
+        target=log_from_queue,
+        args=(stderr_queue, process)
     )
 
     # Start all threads
     stdout_thread.start()
     stderr_thread.start()
-    log_thread.start()
+    stdout_log_thread.start()
+    stderr_log_thread.start()
 
     try:
-        logger.info("Waiting for process to complete...")
-        start_time = time.time()
-        
-        # Monitor process con timeout più lungo e checkpoint
-        while process.poll() is None:
-            time.sleep(5)  # Check ogni 5 secondi
-            elapsed = time.time() - start_time
-            
-            # Log checkpoint ogni 5 minuti
-            if elapsed % 300 < 5:  # ogni ~5 minuti
-                logger.info(f"Training still running... Elapsed: {elapsed/60:.1f} minutes")
-            
-            # Timeout molto lungo per training completo (2 ore)
-            if elapsed > 7200:  
-                logger.error("Training timeout after 2 hours")
-                process.kill()
-                raise subprocess.TimeoutExpired(command, 7200)
-        
-        return_code = process.returncode
-        total_time = time.time() - start_time
-        logger.info(f"Process completed with return code: {return_code} after {total_time/60:.1f} minutes")
-
-        # Give threads a moment to finish processing remaining output
-        time.sleep(3)
+        # Wait for process to complete with timeout
+        process.wait()
 
         # Wait for threads to finish
-        logger.info("Waiting for threads to finish...")
-        stdout_thread.join(timeout=15)
-        stderr_thread.join(timeout=15)
-        log_thread.join(timeout=15)
-        
-        logger.info("All threads finished")
+        stdout_thread.join()
+        stderr_thread.join()
+        stdout_log_thread.join()
+        stderr_log_thread.join()
 
-        if return_code != 0:
-            error_message = f"Training failed with return code: {return_code}"
+        if process.returncode != 0:
+            error_message = "Training failed"
             logger.error(error_message)
-            
-            # Analizza il tipo di errore basato sul return code
-            if return_code == -9:
-                error_type = "Out of Memory (SIGKILL)"
-            elif return_code == -11:
-                error_type = "Segmentation Fault (SIGSEGV)"
-            elif return_code == -6:
-                error_type = "Abort Signal (SIGABRT)"
-            elif return_code == 1:
-                error_type = "General Error"
-            elif return_code == 2:
-                error_type = "Misuse of shell builtins"
-            else:
-                error_type = f"Unknown signal ({return_code})"
-            
-            logger.error(f"Error type identified: {error_type}")
-            
-            # Collect error details
-            stderr_content = "\n".join(error_lines[-30:]) if error_lines else "No stderr output captured"
-            logger.error(f"Last 30 stderr lines:\n{stderr_content}")
-            
-            # Aggiungi informazioni specifiche per debug
-            debug_info = {
-                "process_duration_minutes": total_time / 60,
-                "total_stderr_lines": len(error_lines),
-                "error_type": error_type,
-                "command_executed": " ".join(command)
-            }
-            
             raise HTTPException(
                 status_code=500,
-                detail={
-                    "error": error_message, 
-                    "return_code": return_code,
-                    "error_type": error_type,
-                    "stderr": stderr_content,
-                    "debug_info": debug_info
-                }
+                detail={"error": error_message, "stderr": "Process error"}
             )
 
         logger.info("Training completed successfully")
-        return {
-            "message": "Training completed successfully",
-            "return_code": return_code,
-            "stderr_lines_count": len(error_lines)
-        }
+        return {"message": "Training completed successfully"}
 
-    except subprocess.TimeoutExpired:
-        logger.error("Training process timed out")
-        process.kill()
-        raise HTTPException(
-            status_code=500,
-            detail={"error": "Training process timed out", "stderr": "Process killed due to timeout"}
-        )
     except Exception as e:
         logger.error(f"Unexpected error during training: {str(e)}")
         # Ensure process is terminated if something goes wrong
-        if process.poll() is None:
-            logger.info("Killing process due to error")
-            process.kill()
-        
-        # Collect any available error output
-        stderr_content = "\n".join(error_lines[-10:]) if error_lines else "No stderr output captured"
-        
+        process.kill()
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": "Training failed with exception", 
-                "exception": str(e),
-                "stderr": stderr_content
-            }
+            detail={"error": "Training failed", "stderr": str(e)}
         )
 
 @app.post("/render")

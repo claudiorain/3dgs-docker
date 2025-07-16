@@ -24,60 +24,48 @@ db.training_params.insertOne({
   // === VALORI BASE ===
   "base_params": {
     "iterations": 30000,
-    "densify_grad_threshold": 0.0002,
+    "densify_grad_threshold":0.0002,
     "densification_interval": 100,
     "densify_until_iter": 15000,
-    "opacity_lr": 0.05,
-    "scaling_lr": 0.005,
-    "rotation_lr": 0.001,
-    "percent_dense": 0.01,
+    "eval": true,
     // PARAMETRI MCMC SPECIFICI
     "cap_max": 1500000,
     "scale_reg": 0.02,
-    "opacity_reg": 0.04,
+    "opacity_reg": 0.01,
     "eval":true
   },
   
   // === MOLTIPLICATORI PER QUALITY LEVELS ===
   "quality_multipliers": {
     "fast": {
-      // Parametri originali gaussian splatting
-      "densify_grad_threshold": 1.4,
-      "densification_interval": 1.3,
+      "iterations": 0.8,
+      "densify_grad_threshold":1.0,
+      "densify_from_iter": 0.8,  
       "densify_until_iter": 0.8,
-      "opacity_lr": 1.2,
-      "scaling_lr": 1.1,
-      "rotation_lr": 1.1,
-      // Parametri MCMC specifici
+      "densification_interval": 0.8,
       "cap_max": 1.0,           // 1.5M gaussiane
-      "scale_reg": 1.4,         // 0.028 - più regolarizzazione
-      "opacity_reg": 1.4,       // 0.028 - più regolarizzazione
+      "scale_reg": 1.5,         // 0.028 - più regolarizzazione
+      "opacity_reg": 1.5,       // 0.028 - più regolarizzazione
     },
     "balanced": {
-      // Parametri originali gaussian splatting
-      "densify_grad_threshold": 1.0,
-      "densification_interval": 1.0,
+      "iterations": 1.0,
+      "densify_grad_threshold":1.0,
+      "densify_from_iter": 1.0,  
       "densify_until_iter": 1.0,
-      "opacity_lr": 1.0,
-      "scaling_lr": 1.0,
-      "rotation_lr": 1.0,
-      // Parametri MCMC specifici
-      "cap_max": 2.0,           // 3M gaussiane
-      "scale_reg": 1.0,         // 0.02 - baseline
-      "opacity_reg": 1.0,       // 0.02 - baseline
+      "densification_interval": 1.0,
+      "cap_max": 2,           // 1.5M gaussiane
+      "scale_reg": 1.0,         // 0.028 - più regolarizzazione
+      "opacity_reg": 1.0,       // 0.028 - più regolarizzazione
     },
     "quality": {
-      // Parametri originali gaussian splatting
-      "densify_grad_threshold": 0.9,
-      "densification_interval": 0.9,
-      "densify_until_iter": 1.1,
-      "opacity_lr": 0.8,
-      "scaling_lr": 0.8,
-      "rotation_lr": 0.8,
-      // Parametri MCMC specifici
-      "cap_max": 3,           // 6M gaussiane
-      "scale_reg": 0.8,         // 0.016 - meno regolarizzazione
-      "opacity_reg": 0.8,       // 0.016 - meno regolarizzazione
+      "iterations": 1.2,
+      "densify_grad_threshold":1.0,
+      "densify_from_iter": 1.2,  
+      "densify_until_iter": 1.2,
+      "densification_interval": 1.0,
+      "cap_max": 3,           // 1.5M gaussiane
+      "scale_reg": 0.5,         // 0.028 - più regolarizzazione
+      "opacity_reg": 0.5,       // 0.028 - più regolarizzazione
     }
   },
   
@@ -108,20 +96,8 @@ db.training_params.insertOne({
       "densify_grad_threshold": {
         "formula": "max(1.8, 4.0 - (vram_factor * 2.2))",
         "description": "Scaling uniforme basato solo su VRAM disponibile",
-        "min": 1.8,
+        "min": 1.6,
         "max": 4.0
-      },
-      "densification_interval": {
-        "formula": "max(1.4, 2.8 - (vram_factor * 1.4))",
-        "description": "Scaling uniforme per frequenza densificazione",
-        "min": 1.4,
-        "max": 2.8
-      },
-      "densify_until_iter": {
-        "formula": "max(0.6, 1.0 - (vram_factor * 0.4))",
-        "description": "Scaling uniforme per finestra densificazione",
-        "min": 0.6,
-        "max": 1.0
       },
       "cap_max": {
         "formula": "max(0.6, 0.5 + (vram_factor * 0.5))",
