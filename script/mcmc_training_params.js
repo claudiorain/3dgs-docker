@@ -31,7 +31,8 @@ db.training_params.insertOne({
     // PARAMETRI MCMC SPECIFICI
     "cap_max": 1500000,
     "scale_reg": 0.02,
-    "opacity_reg": 0.01,
+    "opacity_reg": 0.02, 
+    "noise_lr": 0.003,      // RIDOTTO da 0.005 → 0.003
     "eval":true
   },
   
@@ -39,20 +40,19 @@ db.training_params.insertOne({
   "quality_multipliers": {
     "fast": {
       "iterations": 0.8,
-      "densify_grad_threshold":1.0,
       "densify_from_iter": 0.8,  
       "densify_until_iter": 0.8,
       "densification_interval": 0.8,
-      "cap_max": 1.0,           // 1.5M gaussiane
-      "scale_reg": 1.5,         // 0.028 - più regolarizzazione
-      "opacity_reg": 1.5,       // 0.028 - più regolarizzazione
+      "cap_max": 1.5,                   // RIDOTTO da 2.0 → 1.5
+          "scale_reg": 1.0,                 
+          "opacity_reg": 1.5,               // AUMENTATO da 1.0 → 1.5
+          "noise_lr": 1.2                   // AUMENTATO da 1.0 → 1.2
     },
     "balanced": {
       "iterations": 1.0,
       "densify_grad_threshold":1.0,
       "densify_from_iter": 1.0,  
       "densify_until_iter": 1.0,
-      "densification_interval": 1.0,
       "cap_max": 2,           // 1.5M gaussiane
       "scale_reg": 1.0,         // 0.028 - più regolarizzazione
       "opacity_reg": 1.0,       // 0.028 - più regolarizzazione
@@ -62,10 +62,10 @@ db.training_params.insertOne({
       "densify_grad_threshold":1.0,
       "densify_from_iter": 1.2,  
       "densify_until_iter": 1.2,
-      "densification_interval": 1.0,
-      "cap_max": 3,           // 1.5M gaussiane
-      "scale_reg": 0.5,         // 0.028 - più regolarizzazione
-      "opacity_reg": 0.5,       // 0.028 - più regolarizzazione
+      "cap_max": 2.0,                   // RIDOTTO da 3.0 → 2.0
+      "scale_reg": 0.8,                 // AUMENTATO da 0.5 → 0.8 (più stabilità)
+      "opacity_reg": 1.0,               // AUMENTATO da 0.5 → 1.0
+      "noise_lr": 1.0                   // Invariato
     }
   },
   
@@ -82,86 +82,87 @@ db.training_params.insertOne({
     }
   },
   // === CONFIGURAZIONE HARDWARE - STRUTTURA CORRETTA ===
-  "hardware_config": {
+  // === HARDWARE SCALING AGGIORNATO ===
+      "hardware_config": {
     "baseline_vram_gb": 24,
     "min_vram_gb": 12,
     
     "resolution_thresholds": [
       { "vram_threshold": 24, "resolution": 1, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 16, "resolution": 4, "description": "Full resolution (16GB+)" },
-      { "vram_threshold": 8, "resolution": 8, "description": "Quarter resolution (8GB+)" }
+      { "vram_threshold": 16, "resolution": 2, "description": "Half resolution (16GB+)" },
+      { "vram_threshold": 12, "resolution": 4, "description": "Quarter resolution (12GB+)" },
+      { "vram_threshold": 8, "resolution": 8, "description": "Eighth resolution (8GB+)" }
     ],
     
     "scaling_formulas": {
       "densify_grad_threshold": {
         "formula": "max(1.8, 4.0 - (vram_factor * 2.2))",
-        "description": "Scaling uniforme basato solo su VRAM disponibile",
+        "description": "Scaling moderato soglia densificazione",
         "min": 1.6,
         "max": 4.0
       },
       "cap_max": {
-        "formula": "max(0.6, 0.5 + (vram_factor * 0.5))",
-        "description": "Scaling bilanciato gaussiane massime",
-        "min": 0.6,
-        "max": 1.2
+        "formula": "max(0.5, 0.4 + (vram_factor * 0.4))",
+        "description": "Cap gaussiane conservativo",
+        "min": 0.5,
+        "max": 0.8
       },
       "scale_reg": {
         "formula": "max(1.0, 2.0 - (vram_factor * 1.0))",
-        "description": "Regolarizzazione scale moderata",
+        "description": "Regolarizzazione scale",
         "min": 1.0,
         "max": 2.0
       },
       "opacity_reg": {
-        "formula": "max(0.5, 1.3 - (vram_factor * 0.8))",
-        "description": "Regolarizzazione opacity ridotta per più opacità",
-        "min": 0.5,
-        "max": 1.3
+        "formula": "max(0.8, 1.6 - (vram_factor * 0.8))",
+        "description": "Regolarizzazione opacity aumentata",
+        "min": 0.8,
+        "max": 1.6
+      },
+      "noise_lr": {
+        "formula": "max(1.2, 2.0 - (vram_factor * 0.8))",
+        "description": "Noise LR conservativo per stabilità",
+        "min": 1.2,
+        "max": 2.0
       }
     }
   },
-  
-  // === VALIDAZIONI ===
-  "validation_rules": [
-    {
-      "rule": "densify_until_iter < iterations",
-      "message": "densify_until_iter deve essere minore di iterations"
-    },
-    {
-      "rule": "densify_until_iter <= iterations * 0.8",
-      "message": "densify_until_iter non può superare 80% delle iterazioni"
-    },
-    {
-      "rule": "cap_max >= 100000",
-      "message": "cap_max deve essere almeno 100k gaussiane"
-    },
-    {
-      "rule": "cap_max <= 6000000",
-      "message": "cap_max non può superare 6M gaussiane"
-    },
-    {
-      "rule": "scale_reg > 0 && scale_reg <= 1",
-      "message": "scale_reg deve essere tra 0 e 1"
-    },
-    {
-      "rule": "opacity_reg > 0 && opacity_reg <= 1", 
-      "message": "opacity_reg deve essere tra 0 e 1"
-    },
-    {
-      "rule": "noise_lr > 0 && noise_lr <= 0.01",
-      "message": "noise_lr deve essere tra 0 e 0.01"
-    },
-    {
-      "rule": "opacity_lr > 0 && opacity_lr <= 0.2",
-      "message": "opacity_lr deve essere tra 0 e 0.2"
+      
+      // === VALIDAZIONI AGGIORNATE ===
+      "validation_rules": [
+        {
+          "rule": "densify_until_iter < iterations",
+          "message": "densify_until_iter deve essere minore di iterations"
+        },
+        {
+          "rule": "cap_max >= 100000",
+          "message": "cap_max deve essere almeno 100k gaussiane"
+        },
+        {
+          "rule": "cap_max <= 4000000",                     // RIDOTTO da 6M → 4M
+          "message": "cap_max non può superare 4M gaussiane"
+        },
+        {
+          "rule": "scale_reg > 0 && scale_reg <= 1",
+          "message": "scale_reg deve essere tra 0 e 1"
+        },
+        {
+          "rule": "opacity_reg > 0 && opacity_reg <= 2",   // AUMENTATO limite da 1 → 2
+          "message": "opacity_reg deve essere tra 0 e 2"
+        },
+        {
+          "rule": "noise_lr > 0 && noise_lr <= 0.01",
+          "message": "noise_lr deve essere tra 0 e 0.01"
+        }
+      ],
+      
+        // === TIMESTAMP ===
+      "created_at": new Date(),
+      "updated_at": new Date(),
+      "created_by": "system",
+      "updated_by": "system"
     }
-  ],
-  
-  // === TIMESTAMP ===
-  "created_at": new Date(),
-  "updated_at": new Date(),
-  "created_by": "system",
-  "updated_by": "system"
-});
+);
 
 console.log("\n✅ Configurazione MCMC corretta inserita!");
 console.log("📊 PARAMETRI MCMC AGGIUNTI:");

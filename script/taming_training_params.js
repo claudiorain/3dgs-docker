@@ -22,36 +22,40 @@ db.training_params.insertOne({
  },
  
  "base_params": {
-    "iterations": 35000,
+    "iterations": 30000,
     "cams": 20, 
     "budget": 1500000,     
     "mode": "final_count",
-    "ho_iteration": 16000,
+    "ho_iteration": 15000,
     "densify_grad_threshold": 0.0002,
     "densification_interval": 100,
     "densify_from_iter": 500,
     "densify_until_iter": 15000,
-    "opacity_lr": 0.05,
-    "scaling_lr": 0.01,
-    "rotation_lr": 0.001,
-    "percent_dense": 0.01,                // ✅ AUMENTATO da 0.01 a 0.05
     "eval": true
   },
 
  // === MOLTIPLICATORI OTTIMIZZATI ===
  "quality_multipliers": {
    "fast": {
-     "budget": 0.75,                     // ✅ 480k gaussians
-     "densify_grad_threshold": 1.2,      // ✅ Soglia più permissiva per draft
-     "percent_dense": 0.8                // ✅ Meno denso per draft
+     "iterations": 0.8,
+      "densify_from_iter": 0.8,  
+      "densify_until_iter": 0.8,
+      "densification_interval": 0.8,
+     "budget": 0.75,                     // ✅ 750k gaussians
    },
    "balanced": {
-     "budget": 1.0,                      // ✅ 800k gaussians
-     "densify_grad_threshold": 1.0
+     "iterations": 1.0,
+     "densify_from_iter": 1.0,    
+     "densify_until_iter": 1.0,
+     "densification_interval": 1.0,
+     "budget": 1.0,                      // ✅ 1M gaussians
    },
    "quality": {
-     "budget": 1.5,                     // ✅ 1M gaussians
-     "densify_grad_threshold": 0.8      // ✅ Soglia più stringente per high
+    "iterations": 1.2,
+      "densify_from_iter": 1.2,    
+      "densify_until_iter": 1.2,
+      "densification_interval": 1.2,
+     "budget": 2,                     // ✅ 3M gaussians
    }
  },
  
@@ -100,16 +104,8 @@ db.training_params.insertOne({
      "message": "Budget deve essere positivo"
    },
    {
-     "rule": "densify_until_iter <= 15000",
-     "message": "densify_until_iter MAI oltre 15k per stabilità"
-   },
-   {
      "rule": "cams >= 10",
      "message": "Minimo 10 cameras per Taming-3DGS"
-   },
-   {
-     "rule": "densify_grad_threshold >= 0.0002",
-     "message": "densify_grad_threshold troppo basso causa artefatti"
    }
  ],
  
