@@ -24,7 +24,7 @@ db.training_params.insertOne({
  "base_params": {
     "iterations": 30000,
     "cams": 20, 
-    "budget": 1500000,     
+    "budget": 1000000,     
     "mode": "final_count",
     "ho_iteration": 15000,
     "densify_grad_threshold": 0.0002,
@@ -41,6 +41,7 @@ db.training_params.insertOne({
       "densify_from_iter": 0.8,  
       "densify_until_iter": 0.8,
       "densification_interval": 0.8,
+      "ho_iteration": 0.8,
      "budget": 0.75,                     // ✅ 750k gaussians
    },
    "balanced": {
@@ -48,6 +49,7 @@ db.training_params.insertOne({
      "densify_from_iter": 1.0,    
      "densify_until_iter": 1.0,
      "densification_interval": 1.0,
+     "ho_iteration": 1.0,
      "budget": 1.0,                      // ✅ 1M gaussians
    },
    "quality": {
@@ -55,20 +57,27 @@ db.training_params.insertOne({
       "densify_from_iter": 1.2,    
       "densify_until_iter": 1.2,
       "densification_interval": 1.2,
-     "budget": 2,                     // ✅ 3M gaussians
+      "ho_iteration": 1.2,
+      "budget": 2,                     // ✅ 3M gaussians
    }
  },
  
  // === OVERRIDE RESOLUTION ===
-  "quality_overrides": {
+  "preprocessing_params": {
     "fast": {
-      "resolution": 4
+      "target_width": 1920,
+      "target_height": 1080,
+      "target_frames": 150
     },
     "balanced": {
-      "resolution": 2
+      "target_frames": 200,
+      "target_width": 2560,
+      "target_height": 1440,
     },
     "quality": {
-      "resolution": 1
+      "target_width": 3840,
+      "target_height": 2160,
+      "target_frames": 250
     }
   },
  
@@ -77,9 +86,10 @@ db.training_params.insertOne({
    "baseline_vram_gb": 20,
    "min_vram_gb": 8,
    "resolution_thresholds": [
-      { "vram_threshold": 24, "resolution": 1, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 16, "resolution": 4, "description": "Full resolution (16GB+)" },
-      { "vram_threshold": 8, "resolution": 8, "description": "Quarter resolution (8GB+)" }
+      { "vram_threshold": 24, "target_width": 3840,"target_height": 2160, "description": "Full resolution (24GB+)" },
+      { "vram_threshold": 20, "target_width": 2560,"target_height": 1440, "description": "Quarter resolution (16GB+)" },
+      { "vram_threshold": 16, "target_width": 1920,"target_height": 1080, "description": "Quarter resolution (16GB+)" },
+      { "vram_threshold": 8, "target_width": 1280,"target_height": 720, "description": "Eighth resolution (8GB+)" }
     ],
    "scaling_formulas": {
       "densify_grad_threshold": {

@@ -25,7 +25,7 @@ parser.add_argument("--resize", action="store_true")
 parser.add_argument("--magick_executable", default="", type=str)
 # 🆕 NUOVI PARAMETRI PER OTTIMIZZAZIONE
 parser.add_argument("--max_features", default=8000, type=int, help="Maximum number of features per image")
-parser.add_argument("--matching_strategy", default="sequential", choices=["exhaustive", "sequential", "vocab_tree"], 
+parser.add_argument("--matching_strategy", default="exhaustive", choices=["exhaustive", "sequential", "vocab_tree"], 
                     help="Feature matching strategy")
 parser.add_argument("--overlap", default=10, type=int, help="Number of overlapping images for sequential matching")
 args = parser.parse_args()

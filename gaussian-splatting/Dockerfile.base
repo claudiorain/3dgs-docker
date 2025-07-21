@@ -40,5 +40,28 @@ RUN cd submodules/diff-gaussian-rasterization && pip3 install .
 RUN cd submodules/simple-knn && pip3 install .
 RUN cd submodules/fused-ssim && pip3 install .
 
+# =============================================================================
+# ADD DEPTH ANYTHING V2 SUPPORT
+# =============================================================================
+
+# Clone Depth Anything V2 repository
+WORKDIR /workspace
+RUN git clone https://github.com/DepthAnything/Depth-Anything-V2.git
+
+# Install Depth Anything V2 dependencies
+WORKDIR /workspace/Depth-Anything-V2
+RUN pip3 install opencv-python transformers pillow numpy matplotlib
+
+# Create checkpoints directory
+RUN mkdir -p /workspace/Depth-Anything-V2/checkpoints
+
+# Download pre-trained weights (Depth-Anything-V2-Large)
+RUN wget -O /workspace/Depth-Anything-V2/checkpoints/depth_anything_v2_vitl.pth \
+    https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth
+
+# Set working directory back to gaussian-splatting
+WORKDIR /workspace/gaussian-splatting
+
+
 # Start command
 CMD ["bash"]

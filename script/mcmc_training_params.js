@@ -70,15 +70,21 @@ db.training_params.insertOne({
   },
   
   // === OVERRIDE PER QUALITÀ ===
-  "quality_overrides": {
+  "preprocessing_params": {
     "fast": {
-      "resolution": 4
+      "target_width": 1920,
+      "target_height": 1080,
+      "target_frames": 150
     },
     "balanced": {
-      "resolution": 2
+      "target_frames": 200,
+      "target_width": 2560,
+      "target_height": 1440,
     },
     "quality": {
-      "resolution": 1
+      "target_width": 3840,
+      "target_height": 2160,
+      "target_frames": 250
     }
   },
   // === CONFIGURAZIONE HARDWARE - STRUTTURA CORRETTA ===
@@ -88,10 +94,10 @@ db.training_params.insertOne({
     "min_vram_gb": 12,
     
     "resolution_thresholds": [
-      { "vram_threshold": 24, "resolution": 1, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 16, "resolution": 2, "description": "Half resolution (16GB+)" },
-      { "vram_threshold": 12, "resolution": 4, "description": "Quarter resolution (12GB+)" },
-      { "vram_threshold": 8, "resolution": 8, "description": "Eighth resolution (8GB+)" }
+      { "vram_threshold": 24, "resolution_scale_factor": 1, "description": "Full resolution (24GB+)" },
+      { "vram_threshold": 16, "resolution_scale_factor": 2, "description": "Half resolution (16GB+)" },
+      { "vram_threshold": 12, "resolution_scale_factor": 4, "description": "Quarter resolution (12GB+)" },
+      { "vram_threshold": 8, "resolution_scale_factor": 8, "description": "Eighth resolution (8GB+)" }
     ],
     
     "scaling_formulas": {
