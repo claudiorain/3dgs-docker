@@ -94,10 +94,10 @@ db.training_params.insertOne({
     "min_vram_gb": 12,
     
     "resolution_thresholds": [
-      { "vram_threshold": 24, "resolution_scale_factor": 1, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 16, "resolution_scale_factor": 2, "description": "Half resolution (16GB+)" },
-      { "vram_threshold": 12, "resolution_scale_factor": 4, "description": "Quarter resolution (12GB+)" },
-      { "vram_threshold": 8, "resolution_scale_factor": 8, "description": "Eighth resolution (8GB+)" }
+      { "vram_threshold": 24, "target_width": 3840,"target_height": 2160, "description": "Full resolution (24GB+)" },
+      { "vram_threshold": 20, "target_width": 2560,"target_height": 1440, "description": "Quarter resolution (16GB+)" },
+      { "vram_threshold": 16, "target_width": 1920,"target_height": 1080, "description": "Quarter resolution (16GB+)" },
+      { "vram_threshold": 8, "target_width": 1280,"target_height": 720, "description": "Eighth resolution (8GB+)" }
     ],
     
     "scaling_formulas": {
