@@ -3,7 +3,7 @@ FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-devel
 
 ARG TORCH_CUDA_ARCH_LIST="3.5;5.0;6.0;6.1;7.0;7.5;8.0;8.6+PTX"
 ENV DEBIAN_FRONTEND=noninteractive
-ENV LD_LIBRARY_PATH = "/usr/local/lib"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 # Installa i pacchetti essenziali
 RUN apt update && apt install -y git libglew-dev libassimp-dev libboost-all-dev libgtk-3-dev \
@@ -26,8 +26,12 @@ WORKDIR /workspace/gaussian-splatting
 RUN conda update -n base conda && \
     conda install conda-forge::colmap
 
+# 🆕 SCARICA IL VOCABULARY TREE
+RUN mkdir -p /workspace/vocab_trees && \
+    wget -O /workspace/vocab_trees/vocab_tree_flickr100K_words256K.bin \
+    https://demuc.de/colmap/vocab_tree_flickr100K_words256K.bin
+
 # 🆕 COPIA IL TUO CONVERT.PY OTTIMIZZATO
-# Prima copia il file dalla root del progetto
 COPY convert_optimized.py /workspace/convert_optimized.py
 
 # 🔄 SOSTITUISCI IL CONVERT.PY ORIGINALE CON IL TUO
@@ -58,10 +62,9 @@ ENV QT_QPA_PLATFORM=offscreen
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /workspace
+
 # Installa le dipendenze necessarie (fastapi, uvicorn)
 RUN /bin/bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate colmap-converter && pip install fastapi uvicorn"
 
 # Avvia FastAPI con Conda attivo
 CMD ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate colmap-converter && uvicorn api:app --host 0.0.0.0 --port 8060"]
-
-# Salva questa immagine base

@@ -13,6 +13,8 @@ import os
 import logging
 from argparse import ArgumentParser
 import shutil
+import sqlite3
+import numpy as np
 
 # This Python script is based on the shell converter script provided in the MipNerF 360 repository.
 parser = ArgumentParser("Colmap converter")
@@ -25,7 +27,7 @@ parser.add_argument("--resize", action="store_true")
 parser.add_argument("--magick_executable", default="", type=str)
 # 🆕 NUOVI PARAMETRI PER OTTIMIZZAZIONE
 parser.add_argument("--max_features", default=8000, type=int, help="Maximum number of features per image")
-parser.add_argument("--matching_strategy", default="exhaustive", choices=["exhaustive", "sequential", "vocab_tree"], 
+parser.add_argument("--matching_strategy", default="auto", choices=["auto","exhaustive", "sequential", "vocab_tree"], 
                     help="Feature matching strategy")
 parser.add_argument("--overlap", default=10, type=int, help="Number of overlapping images for sequential matching")
 args = parser.parse_args()
@@ -33,7 +35,91 @@ colmap_command = '"{}"'.format(args.colmap_executable) if len(args.colmap_execut
 magick_command = '"{}"'.format(args.magick_executable) if len(args.magick_executable) > 0 else "magick"
 use_gpu = 1 if not args.no_gpu else 0
 
-print("🗺️OPTIMIZED VERSION !!!")
+def analyze_features_for_strategy(database_path):
+    """
+    Analizza le feature estratte per determinare automaticamente
+    la strategia di matching ottimale
+    """
+    
+    try:
+        conn = sqlite3.connect(database_path)
+        cursor = conn.cursor()
+        
+        # Conta immagini totali
+        cursor.execute("SELECT COUNT(*) FROM images")
+        num_images = cursor.fetchone()[0]
+        
+        # Analizza keypoints usando la struttura documentata COLMAP
+        # La tabella keypoints ha: image_id, rows, cols, data
+        cursor.execute("SELECT image_id, rows FROM keypoints WHERE data IS NOT NULL AND rows > 0")
+        keypoint_data = cursor.fetchall()
+        
+        if not keypoint_data:
+            print("❌ No keypoint data found")
+            conn.close()
+            return "vocab_tree", {
+                "num_images": 50,
+                "max_features": 6000,
+                "max_matches": 16384
+            }
+        
+        # Calcola statistiche delle feature (rows = numero di keypoints)
+        feature_counts = [int(row[1]) for row in keypoint_data if row[1] > 0]
+        
+        if not feature_counts:
+            print("❌ No valid feature counts")
+            conn.close()
+            return "vocab_tree", {}
+        
+        avg_features = np.mean(feature_counts)
+        std_features = np.std(feature_counts)
+        feature_consistency = std_features / avg_features if avg_features > 0 else 1
+        
+        conn.close()
+        
+        print(f"📊 Scene Analysis:")
+        print(f"   Images: {num_images}")
+        print(f"   Avg features/image: {avg_features:.0f}")
+        print(f"   Feature consistency: {feature_consistency:.2f}")
+        
+        # LOGICA DI DECISIONE
+        
+        # Scene molto semplici: poche feature, molto consistenti
+        if avg_features < 4000 and feature_consistency < 0.4:
+            print(f"🎯 Simple scene detected → EXHAUSTIVE")
+            return "exhaustive", {}
+        
+        # Scene molto complesse: molte feature
+        elif avg_features > 6000:
+            print(f"🎯 Complex scene detected → VOCAB_TREE (high performance)")
+            return "vocab_tree", {
+                "num_images": 100,
+                "max_features": 8000,
+                "max_matches": 32768
+            }
+        
+        # Scene medie: decisione basata sul numero di immagini
+        else:
+            if num_images <= 150:
+                print(f"🎯 Medium scene, few images → EXHAUSTIVE")
+                return "exhaustive", {}
+            else:
+                print(f"🎯 Medium scene, many images → VOCAB_TREE (balanced)")
+                return "vocab_tree", {
+                    "num_images": 50,
+                    "max_features": 6000,
+                    "max_matches": 24576
+                }
+                
+    except Exception as e:
+        print(f"⚠️ Database analysis failed: {e}")
+        print(f"🔄 Using fallback: VOCAB_TREE")
+        return "vocab_tree", {
+            "num_images": 50,
+            "max_features": 6000,
+            "max_matches": 16384
+        }
+    
 if not args.skip_matching:
     os.makedirs(args.source_path + "/distorted/sparse", exist_ok=True)
 
@@ -54,6 +140,19 @@ if not args.skip_matching:
         logging.error(f"Feature extraction failed with code {exit_code}. Exiting.")
         exit(exit_code)
 
+    if args.matching_strategy == "auto":
+        print("🤖 Auto-detecting optimal matching strategy...")
+        detected_strategy, detected_params = analyze_features_for_strategy(
+            args.source_path + "/distorted/database.db"
+        )
+        args.matching_strategy = detected_strategy
+        
+        # Applica parametri rilevati per vocab_tree
+        if detected_strategy == "vocab_tree":
+            vocab_num_images = detected_params.get("num_images", 50)
+            vocab_max_features = detected_params.get("max_features", 6000)
+            vocab_max_matches = detected_params.get("max_matches", 16384)
+            
     if args.matching_strategy == "exhaustive":
         # Matching exhaustive (originale ma più lento)
         feat_matching_cmd = colmap_command + " exhaustive_matcher \
@@ -69,11 +168,27 @@ if not args.skip_matching:
             --SequentialMatching.quadratic_overlap 1"
             
     elif args.matching_strategy == "vocab_tree":
+
+        # Usa parametri auto-rilevati se disponibili
+        if 'vocab_num_images' in locals():
+            num_imgs = vocab_num_images
+            max_feats = vocab_max_features
+            max_matches = vocab_max_matches
+        else:
+            # Parametri di default
+            num_imgs = 50
+            max_feats = 6000
+            max_matches = 16384
+
         # Vocabulary tree matching (veloce per grandi dataset)
+        vocab_tree_path = "/workspace/vocab_trees/vocab_tree_flickr100K_words256K.bin"
         feat_matching_cmd = colmap_command + " vocab_tree_matcher \
             --database_path " + args.source_path + "/distorted/database.db \
             --SiftMatching.use_gpu " + str(use_gpu) + " \
-            --VocabTreeMatching.vocab_tree_path vocab_tree.bin"
+            --VocabTreeMatching.vocab_tree_path " + vocab_tree_path + " \
+            --VocabTreeMatching.num_images " + str(num_imgs) + " \
+            --VocabTreeMatching.max_num_features " + str(max_feats) + " \
+            --SiftMatching.max_num_matches " + str(max_matches)
 
     exit_code = os.system(feat_matching_cmd)
     if exit_code != 0:
@@ -157,4 +272,4 @@ if(args.resize):
             logging.error(f"12.5% resize failed with code {exit_code}. Exiting.")
             exit(exit_code)
 
-print("Done.")
+
