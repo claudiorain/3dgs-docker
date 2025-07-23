@@ -40,7 +40,7 @@ db.training_params.insertOne({
   // === MOLTIPLICATORI CONSERVATIVI ===
   "quality_multipliers": {
     "fast": {
-      "densification_interval": 1.2,    // RALLENTATO da 0.8 → 1.2
+      "densify_grad_threshold": 1.2,    // RALLENTATO da 0.8 → 1.2
       "cap_max": 0.8,                   // RIDOTTO 800K * 0.8 = 640K gaussiane
       "scale_reg": 1.2,                 // AUMENTATO per più stabilità
       "opacity_reg": 1.5,               // AUMENTATO per pulizia
@@ -54,7 +54,7 @@ db.training_params.insertOne({
       "noise_lr": 1.0
     },
     "quality": {
-      "densify_grad_threshold": 1.0,    // RIDOTTO da 1.2 → 1.0
+      "densify_grad_threshold": 0.8,    // RIDOTTO da 1.2 → 1.0
       "cap_max": 1.8,                   // RIDOTTO da 2.0 → 1.8 (1.44M gaussiane)
       "scale_reg": 0.9,                 // AUMENTATO da 0.8 → 0.9
       "opacity_reg": 1.0,               

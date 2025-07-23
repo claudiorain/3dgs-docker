@@ -32,24 +32,15 @@ db.training_params.insertOne({
   "quality_multipliers": {
     "fast": {
       "iterations": 0.8,
-      "densify_grad_threshold": 1.2,
-      "densify_from_iter": 0.8,
-      "densify_until_iter": 0.8,
-      "densification_interval": 0.8
+      "densify_grad_threshold": 1.2
     },
     "balanced": {
       "iterations": 1.0,
-      "densify_grad_threshold": 1.0,
-      "densify_from_iter": 1.0,
-      "densify_until_iter": 1.0,
-      "densification_interval": 1.0
+      "densify_grad_threshold": 1.0
     },
     "quality": {
       "iterations": 1.2,
-      "densify_grad_threshold": 0.8,
-      "densify_from_iter": 1.2,
-      "densify_until_iter": 1.2,
-      "densification_interval": 1.2
+      "densify_grad_threshold": 0.8
     }
   },
   
