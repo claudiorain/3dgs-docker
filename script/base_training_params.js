@@ -25,22 +25,25 @@ db.training_params.insertOne({
     "densify_grad_threshold": 0.0002,
     "densification_interval": 100,
     "densify_until_iter": 15000,
+    "densify_from_iter":500,
     "eval": true
   },
   
   // === QUALITY MULTIPLIERS: SOLO training parameters ===
   "quality_multipliers": {
     "fast": {
-      "iterations": 0.8,
-      "densify_grad_threshold": 1.2
+      "iterations": 0.5,
+      "densification_interval": 0.75,
+      "densify_until_iter": 0.75,
+       "densify_from_iter": 0.5
     },
     "balanced": {
-      "iterations": 1.0,
-      "densify_grad_threshold": 1.0
     },
     "quality": {
-      "iterations": 1.2,
-      "densify_grad_threshold": 0.8
+      "iterations": 1.5,
+      "densification_interval": 1.25,
+      "densify_until_iter": 1.3,
+      "densify_from_iter": 1.5
     }
   },
   
@@ -48,18 +51,15 @@ db.training_params.insertOne({
   "preprocessing_params": {
     "fast": {
       "target_width": 1920,
-      "target_height": 1080,
-      "target_frames": 150
+      "target_height": 1080
     },
     "balanced": {
-      "target_frames": 200,
       "target_width": 2560,
       "target_height": 1440,
     },
     "quality": {
       "target_width": 3840,
-      "target_height": 2160,
-      "target_frames": 250
+      "target_height": 2160
     }
   },
   

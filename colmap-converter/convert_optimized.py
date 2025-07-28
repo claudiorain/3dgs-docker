@@ -15,6 +15,7 @@ from argparse import ArgumentParser
 import shutil
 import sqlite3
 import numpy as np
+import json
 
 # This Python script is based on the shell converter script provided in the MipNerF 360 repository.
 parser = ArgumentParser("Colmap converter")
@@ -26,7 +27,6 @@ parser.add_argument("--colmap_executable", default="", type=str)
 parser.add_argument("--resize", action="store_true")
 parser.add_argument("--magick_executable", default="", type=str)
 # 🆕 NUOVI PARAMETRI PER OTTIMIZZAZIONE
-parser.add_argument("--max_features", default=8000, type=int, help="Maximum number of features per image")
 parser.add_argument("--matching_strategy", default="auto", choices=["auto","exhaustive", "sequential", "vocab_tree"], 
                     help="Feature matching strategy")
 parser.add_argument("--overlap", default=10, type=int, help="Number of overlapping images for sequential matching")
@@ -57,7 +57,7 @@ def analyze_features_for_strategy(database_path):
         if not keypoint_data:
             print("❌ No keypoint data found")
             conn.close()
-            return "vocab_tree", {
+            return "exhaustive", {
                 "num_images": 50,
                 "max_features": 6000,
                 "max_matches": 16384
@@ -69,7 +69,11 @@ def analyze_features_for_strategy(database_path):
         if not feature_counts:
             print("❌ No valid feature counts")
             conn.close()
-            return "vocab_tree", {}
+            return "exhaustive", {
+                "num_images": 50,
+                "max_features": 6000,
+                "max_matches": 16384
+            }
         
         avg_features = np.mean(feature_counts)
         std_features = np.std(feature_counts)
@@ -83,42 +87,18 @@ def analyze_features_for_strategy(database_path):
         print(f"   Feature consistency: {feature_consistency:.2f}")
         
         # LOGICA DI DECISIONE
-        
-        # Scene molto semplici: poche feature, molto consistenti
-        if avg_features < 4000 and feature_consistency < 0.4:
-            print(f"🎯 Simple scene detected → EXHAUSTIVE")
-            return "exhaustive", {}
-        
-        # Scene molto complesse: molte feature
-        elif avg_features > 6000:
-            print(f"🎯 Complex scene detected → VOCAB_TREE (high performance)")
-            return "vocab_tree", {
-                "num_images": 100,
-                "max_features": 8000,
-                "max_matches": 32768
+        values = {
+                "avg_features": avg_features,
+                "std_features": std_features,
+                "feature_consistency": feature_consistency,
+                "num_images": num_images
             }
+        return "exhaustive", values
         
-        # Scene medie: decisione basata sul numero di immagini
-        else:
-            if num_images <= 150:
-                print(f"🎯 Medium scene, few images → EXHAUSTIVE")
-                return "exhaustive", {}
-            else:
-                print(f"🎯 Medium scene, many images → VOCAB_TREE (balanced)")
-                return "vocab_tree", {
-                    "num_images": 50,
-                    "max_features": 6000,
-                    "max_matches": 24576
-                }
-                
     except Exception as e:
         print(f"⚠️ Database analysis failed: {e}")
         print(f"🔄 Using fallback: VOCAB_TREE")
-        return "vocab_tree", {
-            "num_images": 50,
-            "max_features": 6000,
-            "max_matches": 16384
-        }
+        return "exhaustive", values
     
 if not args.skip_matching:
     os.makedirs(args.source_path + "/distorted/sparse", exist_ok=True)
@@ -130,28 +110,21 @@ if not args.skip_matching:
         --image_path " + args.source_path + "/input \
         --ImageReader.single_camera 1 \
         --ImageReader.camera_model " + args.camera + " \
-        --SiftExtraction.use_gpu " + str(use_gpu) + " \
-        --SiftExtraction.max_num_features " + str(args.max_features) + " \
-        --SiftExtraction.first_octave -1 \
-        --SiftExtraction.num_octaves 4 \
-        --SiftExtraction.octave_resolution 3"
+        --SiftExtraction.use_gpu " + str(use_gpu) 
     exit_code = os.system(feat_extracton_cmd)
     if exit_code != 0:
         logging.error(f"Feature extraction failed with code {exit_code}. Exiting.")
         exit(exit_code)
 
+     # All'inizio del file, dopo gli import, aggiungi:
+    global_reconstruction_params = {}
     if args.matching_strategy == "auto":
         print("🤖 Auto-detecting optimal matching strategy...")
-        detected_strategy, detected_params = analyze_features_for_strategy(
+        detected_strategy, reconstruction_params = analyze_features_for_strategy(
             args.source_path + "/distorted/database.db"
         )
         args.matching_strategy = detected_strategy
-        
-        # Applica parametri rilevati per vocab_tree
-        if detected_strategy == "vocab_tree":
-            vocab_num_images = detected_params.get("num_images", 50)
-            vocab_max_features = detected_params.get("max_features", 6000)
-            vocab_max_matches = detected_params.get("max_matches", 16384)
+        global_reconstruction_params = reconstruction_params
             
     if args.matching_strategy == "exhaustive":
         # Matching exhaustive (originale ma più lento)
@@ -169,26 +142,10 @@ if not args.skip_matching:
             
     elif args.matching_strategy == "vocab_tree":
 
-        # Usa parametri auto-rilevati se disponibili
-        if 'vocab_num_images' in locals():
-            num_imgs = vocab_num_images
-            max_feats = vocab_max_features
-            max_matches = vocab_max_matches
-        else:
-            # Parametri di default
-            num_imgs = 50
-            max_feats = 6000
-            max_matches = 16384
-
         # Vocabulary tree matching (veloce per grandi dataset)
-        vocab_tree_path = "/workspace/vocab_trees/vocab_tree_flickr100K_words256K.bin"
         feat_matching_cmd = colmap_command + " vocab_tree_matcher \
             --database_path " + args.source_path + "/distorted/database.db \
-            --SiftMatching.use_gpu " + str(use_gpu) + " \
-            --VocabTreeMatching.vocab_tree_path " + vocab_tree_path + " \
-            --VocabTreeMatching.num_images " + str(num_imgs) + " \
-            --VocabTreeMatching.max_num_features " + str(max_feats) + " \
-            --SiftMatching.max_num_matches " + str(max_matches)
+            --SiftMatching.use_gpu " + str(use_gpu) 
 
     exit_code = os.system(feat_matching_cmd)
     if exit_code != 0:
@@ -202,11 +159,7 @@ if not args.skip_matching:
         --database_path " + args.source_path + "/distorted/database.db \
         --image_path "  + args.source_path + "/input \
         --output_path "  + args.source_path + "/distorted/sparse \
-        --Mapper.ba_global_function_tolerance=0.000001 \
-        --Mapper.ba_global_max_num_iterations=50 \
-        --Mapper.ba_local_max_num_iterations=10 \
-        --Mapper.tri_ignore_two_view_tracks=1 \
-        --Mapper.min_num_matches=15")
+        --Mapper.ba_global_function_tolerance=0.000001")
     
     print("🗺️  Starting bundle adjustment...")
     exit_code = os.system(mapper_cmd)
@@ -272,4 +225,7 @@ if(args.resize):
             logging.error(f"12.5% resize failed with code {exit_code}. Exiting.")
             exit(exit_code)
 
-
+if global_reconstruction_params is not None:
+    print("RECONSTRUCTION_PARAMS_JSON_START")
+    print(json.dumps(global_reconstruction_params))
+    print("RECONSTRUCTION_PARAMS_JSON_END")

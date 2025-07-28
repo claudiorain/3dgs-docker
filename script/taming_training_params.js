@@ -23,11 +23,10 @@ db.training_params.insertOne({
  
  "base_params": {
     "iterations": 30000,
+    "budget":3000000,
     "cams": 20, 
-    "budget": 1000000,     
     "mode": "final_count",
     "ho_iteration": 15000,
-    "densify_grad_threshold": 0.0002,
     "densification_interval": 100,
     "densify_from_iter": 500,
     "densify_until_iter": 15000,
@@ -37,16 +36,21 @@ db.training_params.insertOne({
  // === MOLTIPLICATORI OTTIMIZZATI ===
  "quality_multipliers": {
    "fast": {
-      "densification_interval": 0.8,
-     "budget": 0.75,                     // ✅ 750k gaussians
+      "iterations": 0.5,
+      "densification_interval": 0.75,
+      "densify_until_iter": 0.75,
+      "densify_from_iter": 0.5,
+      "ho_iteration":  0.75               // ✅ 750k gaussians
    },
    "balanced": {
-     "densification_interval": 1.0,
-     "budget": 1.0,                      // ✅ 1M gaussians
+                     // ✅ 1M gaussians
    },
    "quality": {
-      "densification_interval": 1.2,
-      "budget": 2,                     // ✅ 3M gaussians
+      "iterations": 1.5,
+      "densification_interval": 1.25,
+      "densify_until_iter": 1.3,
+      "densify_from_iter": 1.5,
+      "ho_iteration":  1.3   
    }
  },
  
@@ -82,12 +86,6 @@ db.training_params.insertOne({
         "formula": "max(1.0, 2.5 - (vram_factor * 1.5))",
         "min": 1.0,
         "max": 4.0
-      },
-      "budget": {
-        "formula": "max(0.6, 0.5 + (vram_factor * 0.5))",
-        "description": "Scaling bilanciato gaussiane massime",
-        "min": 0.6,
-        "max": 1.2
       }
  }
 },

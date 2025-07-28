@@ -77,8 +77,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1  # Usa tutte le GPU disponibili
-              capabilities: [gpu]
+              count: all  # Usa tutte le GPU disponibili
+              capabilities: [gpu, compute, utility]  # ✅ Tutte le capabilities
 
   gaussian-splatting-api:
     build:
@@ -108,8 +108,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1  # Usa tutte le GPU disponibili
-              capabilities: [gpu]
+              count: all  # Usa tutte le GPU disponibili
+              capabilities: [gpu, compute, utility]  # ✅ Tutte le capabilities
 
   3dgs-mcmc:  # Cambiato da "app" a "api-gateway"
     build:
@@ -124,8 +124,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1  # Usa tutte le GPU disponibili
-              capabilities: [gpu]
+              count: all  # Usa tutte le GPU disponibili
+              capabilities: [gpu, compute, utility]  # ✅ Tutte le capabilities
 
   3dgs-mcmc-api:
     build:
@@ -172,8 +172,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1  # Usa tutte le GPU disponibili
-              capabilities: [gpu]
+              count: all  # Usa tutte le GPU disponibili
+              capabilities: [gpu, compute, utility]  # ✅ Tutte le capabilities
 
   taming-3dgs-api:
     build:
@@ -204,32 +204,42 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1  # Usa tutte le GPU disponibili
-              capabilities: [gpu]
+              count: all  # Usa tutte le GPU disponibili
+              capabilities: [gpu, compute, utility]  # ✅ Tutte le capabilities
 
-  colmap-converter-api:  # Cambiato da "app" a "api-gateway"
+  colmap-converter-api:
     build:
-      context: ./colmap-converter  # Cartella di build per api-gateway
-      dockerfile: Dockerfile  # Usa Dockerfile.base per costruire l'immagin
+      context: ./colmap-converter
+      dockerfile: Dockerfile
     container_name: colmap-converter-api
     volumes:
-      - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
-      - /tmp/.X11-unix:/tmp/.X11-unix  # Monta il socket X11
-    image: colmap-converter  # 👈 Aggiungi questa riga
+      - shared_data:${MODEL_WORKING_DIR}
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    image: colmap-converter
     ports:
-      - "8060:8060"  # Espone l'API sulla porta 8060
+      - "8060:8060"
     networks:
       - my_network
+    
+    # ❌ NO DEVICES SECTION FOR WSL2
+    
+    # ✅ WSL2-COMPATIBLE ENVIRONMENT:
     environment:
       - XDG_RUNTIME_DIR=/tmp/runtime-root
-      - DISPLAY=${DISPLAY}  # Usa il DISPLAY del sistema host
+      - DISPLAY=${DISPLAY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - CUDA_VISIBLE_DEVICES=0
+      
+    # ✅ GPU ACCESS VIA DEPLOY:
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1  # Usa tutte le GPU disponibili
-              capabilities: [gpu]
+              count: all
+              capabilities: [gpu, compute, utility, graphics]
+
 
   web-viewer:
     build:

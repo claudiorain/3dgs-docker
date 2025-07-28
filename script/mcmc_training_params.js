@@ -28,9 +28,8 @@ db.training_params.insertOne({
     "densify_grad_threshold": 0.0002,
     "densification_interval": 100,
     "densify_until_iter": 15000,
-    "eval": true,
+    "densify_from_iter":500,
     // PARAMETRI MCMC OTTIMIZZATI PER MEMORIA
-    "cap_max": 800000,        // RIDOTTO da 1.5M → 800K (memoria sicura)
     "scale_reg": 0.025,       // AUMENTATO da 0.02 → 0.025 (più regolarizzazione)
     "opacity_reg": 0.025,     // AUMENTATO da 0.02 → 0.025 (più regolarizzazione)
     "noise_lr": 0.002,        // RIDOTTO da 0.003 → 0.002 (più stabilità)
@@ -40,22 +39,22 @@ db.training_params.insertOne({
   // === MOLTIPLICATORI CONSERVATIVI ===
   "quality_multipliers": {
     "fast": {
-      "densify_grad_threshold": 1.2,    // RALLENTATO da 0.8 → 1.2
-      "cap_max": 0.8,                   // RIDOTTO 800K * 0.8 = 640K gaussiane
+      "cap_max":3000000,
+      "iterations": 0.5,
+      "densification_interval": 0.75,
+      "densify_until_iter": 0.75,
+       "densify_from_iter": 0.5,
       "scale_reg": 1.2,                 // AUMENTATO per più stabilità
       "opacity_reg": 1.5,               // AUMENTATO per pulizia
       "noise_lr": 1.5                   // AUMENTATO per convergenza veloce
     },
     "balanced": {
-      "densify_grad_threshold": 1.0,
-      "cap_max": 1.25,                  // RIDOTTO da 2.0 → 1.25 (1M gaussiane max)
-      "scale_reg": 1.0,                 
-      "opacity_reg": 1.2,               // AUMENTATO da 1.0 → 1.2
-      "noise_lr": 1.0
     },
     "quality": {
-      "densify_grad_threshold": 0.8,    // RIDOTTO da 1.2 → 1.0
-      "cap_max": 1.8,                   // RIDOTTO da 2.0 → 1.8 (1.44M gaussiane)
+      "iterations": 1.5,
+      "densification_interval": 1.25,
+      "densify_until_iter": 1.3,
+      "densify_from_iter": 1.5,    // RIDOTTO da 1.2 → 1.0
       "scale_reg": 0.9,                 // AUMENTATO da 0.8 → 0.9
       "opacity_reg": 1.0,               
       "noise_lr": 0.8                   // RIDOTTO per stabilità
@@ -93,15 +92,9 @@ db.training_params.insertOne({
     "scaling_formulas": {
       "densify_grad_threshold": {
         "description": "Conservative densification",
-        "formula": "max(1.2, 3.0 - (vram_factor * 1.8))",  // Più conservativo
+        "formula": "max(1.0, 2.5 - (vram_factor * 1.5))",
         "min": 1.2,
         "max": 3.0
-      },
-      "cap_max": {
-        "formula": "max(0.3, 0.2 + (vram_factor * 0.3))",  // MOLTO conservativo
-        "description": "Cap gaussiane ultra-conservativo",
-        "min": 0.3,  // 240K gaussiane minimo
-        "max": 0.5   // 400K gaussiane massimo
       },
       "scale_reg": {
         "formula": "max(1.2, 2.5 - (vram_factor * 1.3))",  // Più regolarizzazione
