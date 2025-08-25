@@ -56,8 +56,8 @@ db.training_params.insertOne({
       "target_height": 720
     },
     "balanced": {
-      "target_width": 1920,
-      "target_height": 1080,
+      "target_width": 2560,
+      "target_height": 1440,
     },
     "quality": {
       "target_width": 2560,
@@ -71,40 +71,12 @@ db.training_params.insertOne({
     "min_vram_gb": 12,
     
      "resolution_thresholds": [
-      { "vram_threshold": 30, "target_width": 3840,"target_height": 2160, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 24, "target_width": 2560,"target_height": 1440, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 20, "target_width": 1920,"target_height": 1080, "description": "Quarter resolution (20GB+)" },
-      { "vram_threshold": 16, "target_width": 1280,"target_height": 720, "description": "Quarter resolution (16GB+)" },
-      { "vram_threshold": 12, "target_width": 854,"target_height": 480, "description": "Eighth resolution (8GB+)" },
-      { "vram_threshold": 8, "target_width": 426,"target_height": 240, "description": "Eighth resolution (8GB+)" }
+      { "vram_threshold": 16, "target_width": 2560,"target_height": 1440, "description": "Full resolution (24GB+)" },
 
     ],
     
     "scaling_formulas": {
-      "densify_grad_threshold": {
-        "description": "Conservative densification",
-        "formula": "max(1.0, 3 - (vram_factor * 1.5))",
-        "min": 1.0,
-        "max": 4.0
-      },
-      "scale_reg": {
-        "formula": "max(1.2, 2.5 - (vram_factor * 1.3))",  // Più regolarizzazione
-        "description": "Regolarizzazione scale aumentata",
-        "min": 1.2,
-        "max": 2.5
-      },
-      "opacity_reg": {
-        "formula": "max(1.0, 2.0 - (vram_factor * 1.0))",  // Regolarizzazione alta
-        "description": "Regolarizzazione opacity forte",
-        "min": 1.0,
-        "max": 2.0
-      },
-      "noise_lr": {
-        "formula": "max(1.5, 2.5 - (vram_factor * 1.0))",  // Noise alto per compensare
-        "description": "Noise LR compensativo",
-        "min": 1.5,
-        "max": 2.5
-      }
+   
     }
   },
   

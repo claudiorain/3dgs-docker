@@ -31,7 +31,7 @@ RUN cp /workspace/convert_optimized.py /workspace/gaussian-splatting/convert.py 
 # ✅ CREATE PYTHON VIRTUAL ENV and install everything with PIP
 RUN python3 -m venv /workspace/venv && \
     /workspace/venv/bin/pip install --upgrade pip && \
-    /workspace/venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 && \
+    /workspace/venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
     /workspace/venv/bin/pip install fastapi uvicorn numpy pillow opencv-python && \
     /workspace/venv/bin/pip install plyfile tqdm
 
@@ -44,14 +44,6 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH="/workspace/venv/bin:$PATH"
 
 WORKDIR /workspace
-
-# ✅ Final verification
-RUN echo "=== FINAL VERIFICATION ===" && \
-    echo "Ubuntu version:" && cat /etc/os-release | grep VERSION= && \
-    echo "COLMAP ready:" && colmap help | head -3 && \
-    echo "PyTorch CUDA test:" && \
-    /workspace/venv/bin/python3 -c 'import torch; print(f"✅ CUDA available: {torch.cuda.is_available()}")' && \
-    echo "=== COLMAP + PYTORCH + CUDA ALL READY! ==="
 
 # Start application
 CMD ["/workspace/venv/bin/python3", "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8060"]

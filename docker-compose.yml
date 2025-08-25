@@ -87,7 +87,7 @@ services:
       args:
       - API_PORT=${GAUSSIAN_SPLATTING_PORT:-8100}
     container_name: gaussian-splatting-api
-    mem_limit: 20G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
+    mem_limit: 24G  # Imposta un limite di memoria più alto (ad esempio 32 GB)
     memswap_limit: 32G  # Limite di memoria + swap a 36 GB
     volumes:
       - shared_data:${MODEL_WORKING_DIR}   # Stesso volume condiviso
@@ -262,42 +262,63 @@ services:
       - my_network
       
   mongo:
-    image: mongo
+    image: mongo:8.0       # ⇦ PIN consigliato (resta su 5.0.x se i datafile nascono con 5.0)
     container_name: mongo
-    command: mongod --replSet rs0 --bind_ip_all
-    healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+    command: ["--replSet","rs0","--bind_ip_all","--wiredTigerCacheSizeGB","1"]
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db  # Aggiungi il volume persistente per MongoDB
+      - mongodb_data:/data/db      # volume nominato, NON bind su FS Windows
     networks:
       - my_network
     environment:
       - MONGO_INITDB_DATABASE=3d_gaussian_splatting
-    
+    healthcheck:
+      test: ["CMD","mongosh","--quiet","mongodb://localhost:27017/admin","--eval","db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    stop_grace_period: 60s
+    ulimits:
+      nofile:
+        soft: 64000
+        hard: 64000
+    restart: unless-stopped
+ 
   # Servizio separato per inizializzare il replica set
   mongo-setup:
-    image: mongo:5.0
-    container_name: mongo-setup
+    image: mongo:8.0       # (o 5.0.x se resti su 5)
     depends_on:
       mongo:
-        condition: service_healthy  # Aspetta che mongo sia healthy
+        condition: service_healthy
     networks:
       - my_network
-    command: |
-      mongosh --host mongo:27017 --eval "
-      try {
-        rs.status();
-        print('Replica set already initialized');
-      } catch(e) {
-        rs.initiate({
-          _id: 'rs0',
-          members: [{ _id: 0, host: 'mongo:27017' }]
-        });
-        print('Replica set initialized');
-      }"
     restart: "no"
+    command: >
+      bash -lc "
+      mongosh --host mongo:27017 --eval '
+        try {
+          rs.status();
+          print(\"Replica set already initialized\");
+        } catch(e) {
+          rs.initiate({_id:\"rs0\", members:[{_id:0, host:\"mongo:27017\"}]});
+          print(\"Replica set initialized\");
+        }'"
+
+  mongo-backup:
+    image: mongo:8.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - mongo_backups:/backup
+    networks:
+      - my_network
+    entrypoint: [ "bash","-lc",
+      "while true; do \
+        mongodump --host=mongo:27017 --archive=/backup/$(date +%F_%H%M).gz --gzip && \
+        find /backup -type f -mtime +7 -delete; \
+      sleep 3600; done" ]
 
   rabbitmq:
     image: "rabbitmq:3-management"  # Usa l'immagine RabbitMQ con interfaccia di gestione
@@ -327,6 +348,8 @@ services:
 
 volumes:
   mongodb_data:  # Definisce il volume del db
+    driver: local
+  mongo_backups:
     driver: local
   rabbitmq_data:  # Definisce il volume della coda di messaggi
     driver: local 

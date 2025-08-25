@@ -60,7 +60,6 @@ async def run_train(request: TrainRequest):
     params = request.params
     command = ["python3", "/workspace/taming-3dgs/train.py"]
     command.extend([
-        "--resolution", "1",
         "-s", request.input_dir,
         "-m", request.output_dir
     ])
@@ -74,14 +73,14 @@ async def run_train(request: TrainRequest):
                 command.append(f"--{param_key}")
         elif param_key != 'resolution':
             # Parametri normali con valore
-            command.extend([f"--{param_key}", str(value)])
-            
+            command.extend([f"--{param_key}", str(value)])  
+
     process = subprocess.Popen(
-    command,
-    stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True,  # <-- garantisce modalità testo
-    bufsize=1,  # line buffering
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,  # <-- garantisce modalità testo
+        bufsize=1,  # line buffering
     )
 
      # Create queues for stdout and stderr

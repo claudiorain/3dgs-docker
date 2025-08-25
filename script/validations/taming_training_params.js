@@ -70,21 +70,9 @@ db.training_params.insertOne({
    "baseline_vram_gb": 24,
    "min_vram_gb": 8,
     "resolution_thresholds": [
-      { "vram_threshold": 24, "target_width": 3840,"target_height": 2160, "description": "Full resolution (24GB+)" },
-      { "vram_threshold": 20, "target_width": 2560,"target_height": 1440, "description": "Quarter resolution (20GB+)" },
-      { "vram_threshold": 16, "target_width": 1280,"target_height": 720, "description": "Quarter resolution (16GB+)" },
-      { "vram_threshold": 12, "target_width": 854,"target_height": 480, "description": "Eighth resolution (8GB+)" },
-      { "vram_threshold": 8, "target_width": 640,"target_height": 480, "description": "Eighth resolution (8GB+)" }
+      { "vram_threshold": 16, "target_width": 2560,"target_height": 1440, "description": "Full resolution (24GB+)" },
 
-    ],
-   "scaling_formulas": {
-      "densify_grad_threshold": {
-        "description": "Balanced: scaling moderato",
-        "formula": "max(1.0, 3 - (vram_factor * 1.5))",
-        "min": 1.0,
-        "max": 4.0
-      }
-    }
+    ]
 },
 
  // === VALIDAZIONE OTTIMIZZATA ===

@@ -69,7 +69,6 @@ def run_train(request: TrainRequest):
     command = ["python3", "/workspace/3dgs-mcmc/train.py"  ]
     command.extend([
         "--init_type", "sfm",
-        "--resolution", "1",
         "-s", request.input_dir,
         "-m", request.output_dir
     ])
@@ -85,7 +84,6 @@ def run_train(request: TrainRequest):
         elif param_key != 'resolution':
             # Parametri normali con valore
             command.extend([f"--{param_key}", str(value)])
-    
     logger.info(f"Command: {' '.join(command)}")
     
     # Create process with pipes
