@@ -4,9 +4,6 @@ import subprocess
 import threading
 import queue
 import logging
-import re
-import json
-
 
 app = FastAPI()
 
@@ -97,24 +94,6 @@ async def run_convert(request: ConvertRequest):
             detail={"error": "Conversion failed", "stderr": "\n".join(stderr_lines)}
         )
 
-    # Cerca JSON tra i log letti
-    stdout_text = "\n".join(stdout_lines)
-    match = re.search(
-        r"RECONSTRUCTION_PARAMS_JSON_START\n(.*?)\nRECONSTRUCTION_PARAMS_JSON_END",
-        stdout_text,
-        re.DOTALL
-    )
-
-    reconstruction_params = {}
-    if match:
-        try:
-            reconstruction_params = json.loads(match.group(1))
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to parse reconstruction_params JSON: {e}")
-
     logger.info("Conversion completed successfully")
 
-    return {
-        "message": "Conversion completed successfully",
-        "reconstruction_params": reconstruction_params
-    }
+    return {"message": "Conversion completed successfully"}

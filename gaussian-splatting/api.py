@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class TrainRequest(BaseModel):
     input_dir: str  
     output_dir: str
+    has_depths: bool
     params: Dict[str, Any] = Field(
         default_factory=dict, 
         description="Parametri specifici dell'algoritmo (generati auto se quality_level specificato)"
@@ -62,14 +63,12 @@ async def run_train(request: TrainRequest):
 
     # ✅ Fix: Inizializza come LISTA
     command = ["python3", "/workspace/gaussian-splatting/train.py"]
-    depths_dir = os.path.join(request.input_dir, 'depths')
 
     # Parametri obbligatori
     command.extend([
         "--resolution", "1",
         "-s", request.input_dir,
         "-m", request.output_dir,
-        "-d",depths_dir
     ])
 
     # Tutti gli altri parametri automaticamente
@@ -83,7 +82,12 @@ async def run_train(request: TrainRequest):
         elif param_key != 'resolution':
             # Parametri normali con valore
             command.extend([f"--{param_key}", str(value)])
-    command.append(f"--antialiasing")
+
+    if request.has_depths:
+        depths_dir = os.path.join(request.input_dir, 'depths')
+        command.extend([f"-d", depths_dir])
+
+    #command.append(f"--antialiasing")
     logger.info(f"Command: {' '.join(command)}")
     
     # ✅ Fix: Rimuovi shell=True quando usi lista
